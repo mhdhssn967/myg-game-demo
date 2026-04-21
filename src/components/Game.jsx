@@ -86,7 +86,8 @@ export default function Game() {
 
     // ── State ─────────────────────────────────────────────────────────────
     let state = 'idle';
-    let score = 0, bestScore = 0, frameCount = 0, speed = 2; // Very slow constant speed
+    let score = 0, bestScore = 0, frameCount = 0;
+    let speed = 3; // Slightly increased for responsiveness on mobile
     let velY = 0, onGround = true, jumpCount = 0;
     let obstacles = [], nextObstacleIn = 90;
     let coins = [], coinsCollected = 0;
@@ -422,7 +423,6 @@ export default function Game() {
 
       // Coin Count Text
       ctx.fillStyle = '#fff'; ctx.font = '28px "Luckiest Guy"'; ctx.textAlign = 'left';
-      ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 4;
       ctx.fillText(coinsCollected, 18, 10);
       ctx.restore();
     }
@@ -537,22 +537,22 @@ export default function Game() {
       bgAudio.current.play().catch(e => console.log('Audio play failed:', e));
     }
 
-    function update() {
+    function update(dtScale) {
       if (state !== 'running') return;
-      frameCount++; score += 0.1;
+      frameCount += dtScale; score += 0.1 * dtScale;
       
-      // Removed speed acceleration, kept at constant speed
-      scrollFar += speed * 0.2; scrollMid += speed * 0.4;
-      scrollNear += speed * 0.7; scrollTrees += speed;
+      const move = speed * dtScale;
+      scrollFar += move * 0.2; scrollMid += move * 0.4;
+      scrollNear += move * 0.7; scrollTrees += move;
 
-      velY += GRAVITY; charY += velY;
+      velY += GRAVITY * dtScale; charY += velY * dtScale;
       if (charY >= GROUND_Y - CHAR_SIZE/2) {
         charY = GROUND_Y - CHAR_SIZE/2; velY = 0; onGround = true; jumpCount = 0;
       } else {
         onGround = false;
       }
 
-      nextObstacleIn--;
+      nextObstacleIn -= dtScale;
       if (nextObstacleIn <= 0) {
         const isTall = Math.random() > 0.7; // 30% chance for a tall obstacle
         const h = isTall ? (110 + Math.random() * 40) : (45 + Math.random() * 30);
@@ -566,7 +566,6 @@ export default function Game() {
         for (let i = 0; i < coinCount; i++) {
           const angle = (i / (coinCount - 1)) * Math.PI;
           const cx = ox + Math.cos(angle + Math.PI) * 90; // Wider arc
-          // Guaranteed height clearance (starts 70px above the box)
           const cy = GROUND_Y - h - 70 - Math.sin(angle) * 70;
           coins.push({ x: cx, y: cy, collected: false });
         }
@@ -576,12 +575,11 @@ export default function Game() {
       }
 
       // Random ground coins or lines - ONLY if no obstacle is nearby
-      if (frameCount % 120 === 0 && Math.random() > 0.5 && nextObstacleIn > 120) {
+      if (Math.random() < 0.008 * dtScale && nextObstacleIn > 120) {
         const count = 3 + Math.floor(Math.random() * 4);
         const startX = W + 300;
         const groundType = Math.random() > 0.5;
         
-        // Simple safety: only spawn if the startX is reasonably far from existing obstacles
         const safe = !obstacles.some(o => Math.abs(o.x - startX) < 150);
         
         if (safe) {
@@ -595,17 +593,16 @@ export default function Game() {
         }
       }
 
-      // Rare Special Coin - only one at a time
-      if (frameCount % 400 === 0 && !coins.some(c => c.special)) {
+      // Special Coin Spawn
+      if (Math.random() < 0.002 * dtScale && !coins.some(c => c.special)) {
         coins.push({ 
           x: W + 100, 
           y: GROUND_Y - 200 - Math.random() * 100, 
-          special: true, 
-          collected: false 
+          special: true, collected: false 
         });
       }
 
-      coins.forEach(c => c.x -= speed);
+      coins.forEach(c => c.x -= move);
       coins = coins.filter(c => c.x > -100 && !c.collected);
 
       // Coin collection
@@ -634,47 +631,41 @@ export default function Game() {
         }
       });
 
-      // Milestone Celebration (Every 100 coins)
+      // Milestone Celebration
       if (coinsCollected > 0 && Math.floor(coinsCollected / 100) > lastMilestone) {
         lastMilestone = Math.floor(coinsCollected / 100);
         milestoneText = `${lastMilestone * 100} COINS!`;
-        milestoneTimer = 120; // 2 seconds
-        
-        // HUGE confetti burst from center
-        for(let i=0; i<3; i++) {
-          spawnParticles(W/2 + (i-1)*50, H/2, null, 40, true);
-        }
-        
+        milestoneTimer = 120;
+        for(let i=0; i<3; i++) spawnParticles(W/2 + (i-1)*50, H/2, null, 40, true);
         yayAudio.current.currentTime = 0;
         yayAudio.current.play().catch(() => {});
       }
 
-      if (milestoneTimer > 0) milestoneTimer--;
+      if (milestoneTimer > 0) milestoneTimer -= dtScale;
 
       // Update particles & floaters
       particles.forEach(p => {
-        p.vx *= (p.drag || 1); // Air resistance
-        p.x += p.vx; p.y += p.vy; p.vy += 0.15;
-        p.alpha -= 0.015; p.rot += p.vrot;
+        p.vx *= (p.drag || 1);
+        p.x += p.vx * dtScale; p.y += p.vy * dtScale; p.vy += 0.15 * dtScale;
+        p.alpha -= 0.015 * dtScale; p.rot += p.vrot * dtScale;
       });
       particles = particles.filter(p => p.alpha > 0);
 
       floaters.forEach(f => {
-        f.y -= 1.5;
-        f.alpha -= 0.02;
+        f.y -= 1.5 * dtScale;
+        f.alpha -= 0.02 * dtScale;
       });
       floaters = floaters.filter(f => f.alpha > 0);
-      obstacles.forEach(o => o.x -= speed);
+      obstacles.forEach(o => o.x -= move);
       obstacles = obstacles.filter(o => o.x > -100);
 
       if (obstacles.some(o => {
         const dx = Math.abs(CHAR_X - o.x);
         const dy = Math.abs(charY - (GROUND_Y - o.h/2));
-        // Generous collision tuning
         return dx < (CHAR_SIZE*0.25 + o.w/2) && dy < (CHAR_SIZE*0.35 + o.h/2);
       })) {
         state = 'dead';
-        bgAudio.current.pause(); // Stop music when player dies
+        bgAudio.current.pause();
         if (score > bestScore) bestScore = score;
       }
     }
@@ -706,8 +697,15 @@ export default function Game() {
       }
     }
 
-    function loop() { update(); draw(); animId = requestAnimationFrame(loop); }
-    loop();
+    let lastTime = 0;
+    function loop(now) { 
+      const dt = lastTime ? (now - lastTime) / 16.67 : 1;
+      lastTime = now;
+      update(Math.min(2, dt)); // Clamp dt to avoid huge jumps
+      draw(); 
+      animId = requestAnimationFrame(loop); 
+    }
+    animId = requestAnimationFrame(loop); 
 
     return () => {
       cancelAnimationFrame(animId);
