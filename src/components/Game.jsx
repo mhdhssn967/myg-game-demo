@@ -11,6 +11,7 @@ export default function Game() {
   const jumpAudio = useRef(new Audio('/sounds/jump.mp3'));
   const coinAudio = useRef(new Audio('/sounds/coin.mp3'));
   const bonusAudio = useRef(new Audio('/sounds/bonus.mp3'));
+  const yayAudio = useRef(new Audio('/sounds/yay.mp3'));
 
   useEffect(() => {
     bgAudio.current.loop = true;
@@ -18,6 +19,7 @@ export default function Game() {
     jumpAudio.current.volume = 0.8;
     coinAudio.current.volume = 0.5;
     bonusAudio.current.volume = 0.7;
+    yayAudio.current.volume = 0.8;
 
     spriteSheet.current.src = runSprite;
     spriteSheet.current.onload = () => {
@@ -88,6 +90,8 @@ export default function Game() {
     let velY = 0, onGround = true, jumpCount = 0;
     let obstacles = [], nextObstacleIn = 90;
     let coins = [], coinsCollected = 0;
+    let lastMilestone = 0;
+    let milestoneText = '', milestoneTimer = 0;
     let particles = [], floaters = [];
     let scrollFar = 0, scrollMid = 0, scrollNear = 0, scrollTrees = 0;
     let animId;
@@ -369,17 +373,19 @@ export default function Game() {
       });
     }
 
-    function spawnParticles(x, y, color, count = 8) {
+    function spawnParticles(x, y, color, count = 8, isSpecial = false) {
       for (let i = 0; i < count; i++) {
+        const speedMult = isSpecial ? 1.5 : 1;
         particles.push({
           x, y, 
-          vx: (Math.random() - 0.5) * 8,
-          vy: (Math.random() - 0.5) * 8 - 3,
-          s: 3 + Math.random() * 5,
+          vx: (Math.random() - 0.5) * 8 * speedMult,
+          vy: (Math.random() - 0.5) * 10 * speedMult - (isSpecial ? 5 : 2),
+          s: (isSpecial ? 6 + Math.random() * 8 : 3 + Math.random() * 5),
           alpha: 1,
           rot: Math.random() * Math.PI * 2,
-          vrot: (Math.random() - 0.5) * 0.3,
-          color: color || (['#FF5252', '#FFEB3B', '#4ADE80', '#40C4FF', '#E040FB'][Math.floor(Math.random() * 5)])
+          vrot: (Math.random() - 0.5) * 0.4,
+          color: color || (['#FF5252', '#FFEB3B', '#4ADE80', '#40C4FF', '#E040FB'][Math.floor(Math.random() * 5)]),
+          drag: isSpecial ? 0.96 : 0.98
         });
       }
     }
@@ -522,7 +528,9 @@ export default function Game() {
     function resetGame() {
       score = 0; frameCount = 0; speed = 2; // Start at very slow constant
       charY = GROUND_Y - CHAR_SIZE; velY = 0; onGround = true; jumpCount = 0;
-      obstacles = []; nextObstacleIn = 90; coins = []; coinsCollected = 0; particles = []; floaters = []; state = 'running';
+      obstacles = []; nextObstacleIn = 90; coins = []; coinsCollected = 0; 
+      lastMilestone = 0; milestoneTimer = 0;
+      particles = []; floaters = []; state = 'running';
       
       // Restart background music
       bgAudio.current.currentTime = 0;
@@ -611,7 +619,7 @@ export default function Game() {
             if (c.special) {
               coinsCollected += 10;
               score += 100;
-              spawnParticles(c.x, c.y, null, 20); // Multi-color confetti
+              spawnParticles(c.x, c.y, null, 50, true); // BIG multi-color confetti
               floaters.push({ x: c.x, y: c.y, text: '+10', alpha: 1 });
               bonusAudio.current.currentTime = 0;
               bonusAudio.current.play().catch(e => {});
@@ -626,10 +634,28 @@ export default function Game() {
         }
       });
 
+      // Milestone Celebration (Every 100 coins)
+      if (coinsCollected > 0 && Math.floor(coinsCollected / 100) > lastMilestone) {
+        lastMilestone = Math.floor(coinsCollected / 100);
+        milestoneText = `${lastMilestone * 100} COINS!`;
+        milestoneTimer = 120; // 2 seconds
+        
+        // HUGE confetti burst from center
+        for(let i=0; i<3; i++) {
+          spawnParticles(W/2 + (i-1)*50, H/2, null, 40, true);
+        }
+        
+        yayAudio.current.currentTime = 0;
+        yayAudio.current.play().catch(() => {});
+      }
+
+      if (milestoneTimer > 0) milestoneTimer--;
+
       // Update particles & floaters
       particles.forEach(p => {
+        p.vx *= (p.drag || 1); // Air resistance
         p.x += p.vx; p.y += p.vy; p.vy += 0.15;
-        p.alpha -= 0.02; p.rot += p.vrot;
+        p.alpha -= 0.015; p.rot += p.vrot;
       });
       particles = particles.filter(p => p.alpha > 0);
 
@@ -668,6 +694,16 @@ export default function Game() {
         { text: 'Tap to start', size: 20, color: '#4ADE80', y: 30 }
       ]);
       if (state === 'dead') drawGameOver();
+
+      if (milestoneTimer > 0) {
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, milestoneTimer / 20);
+        ctx.fillStyle = '#FFEB3B'; ctx.font = '50px "Luckiest Guy"';
+        ctx.textAlign = 'center'; ctx.strokeStyle = '#000'; ctx.lineWidth = 6;
+        ctx.strokeText(milestoneText, W/2, H/2 - 50);
+        ctx.fillText(milestoneText, W/2, H/2 - 50);
+        ctx.restore();
+      }
     }
 
     function loop() { update(); draw(); animId = requestAnimationFrame(loop); }
