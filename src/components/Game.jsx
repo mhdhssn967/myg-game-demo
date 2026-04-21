@@ -271,6 +271,31 @@ export default function Game() {
       });
     }
 
+    function drawStar(cx, cy, spikes, outerRadius, innerRadius, color) {
+      let rot = Math.PI / 2 * 3;
+      let x = cx;
+      let y = cy;
+      let step = Math.PI / spikes;
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - outerRadius)
+      for (let i = 0; i < spikes; i++) {
+        x = cx + Math.cos(rot) * outerRadius;
+        y = cy + Math.sin(rot) * outerRadius;
+        ctx.lineTo(x, y)
+        rot += step
+
+        x = cx + Math.cos(rot) * innerRadius;
+        y = cy + Math.sin(rot) * innerRadius;
+        ctx.lineTo(x, y)
+        rot += step
+      }
+      ctx.lineTo(cx, cy - outerRadius);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+
     function drawCoins() {
       coins.forEach(c => {
         if (c.collected) return;
@@ -283,28 +308,39 @@ export default function Game() {
 
         const isSpecial = c.special;
 
-        // 3D Shadow Edge
-        if (w < 0.8) {
-          ctx.fillStyle = isSpecial ? '#7B1FA2' : '#B8860B'; 
-          ctx.beginPath(); ctx.ellipse(spin * 2, 0, (isSpecial ? 14 : 10) * w, isSpecial ? 14 : 10, 0, 0, Math.PI * 2); ctx.fill();
+        if (isSpecial) {
+           // SPECIAL STAR VISUALS
+           ctx.scale(w, 1);
+           
+           // Glow
+           const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 30);
+           glow.addColorStop(0, 'rgba(255, 255, 255, 0.8)'); glow.addColorStop(0.5, 'rgba(233, 30, 99, 0.4)'); glow.addColorStop(1, 'rgba(233, 30, 99, 0)');
+           ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, 30, 0, Math.PI * 2); ctx.fill();
+
+           drawStar(0, 0, 5, 18, 9, '#FF4081'); // Outer
+           drawStar(0, 0, 5, 12, 6, '#F8BBD0'); // Inner
+           drawStar(0, 0, 5, 6, 3, '#FFFFFF');  // Core highlight
+        } else {
+           // NORMAL COIN VISUALS
+           // 3D Shadow Edge
+           if (w < 0.8) {
+             ctx.fillStyle = '#B8860B'; // Dark gold edge
+             ctx.beginPath(); ctx.ellipse(spin * 2, 0, 10 * w, 10, 0, 0, Math.PI * 2); ctx.fill();
+           }
+
+           // Outer Glow
+           const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 15);
+           glow.addColorStop(0, '#FFF176'); glow.addColorStop(1, 'rgba(253, 216, 53, 0)');
+           ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.fill();
+
+           // Main Coin Face
+           ctx.scale(w, 1);
+           ctx.fillStyle = '#FDD835'; ctx.strokeStyle = '#FBC02D'; ctx.lineWidth = 2;
+           ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+           
+           // Inner detail
+           ctx.fillStyle = '#FFEE58'; ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.fill();
         }
-
-        // Outer Glow
-        const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, isSpecial ? 25 : 15);
-        glow.addColorStop(0, isSpecial ? '#E1BEE7' : '#FFF176'); 
-        glow.addColorStop(1, isSpecial ? 'rgba(156, 39, 176, 0)' : 'rgba(253, 216, 53, 0)');
-        ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, isSpecial ? 25 : 15, 0, Math.PI * 2); ctx.fill();
-
-        // Main Coin Face
-        ctx.scale(w, 1);
-        ctx.fillStyle = isSpecial ? '#9C27B0' : '#FDD835'; 
-        ctx.strokeStyle = isSpecial ? '#7B1FA2' : '#FBC02D'; 
-        ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(0, 0, isSpecial ? 14 : 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-        
-        // Inner detail
-        ctx.fillStyle = isSpecial ? '#E1BEE7' : '#FFEE58'; 
-        ctx.beginPath(); ctx.arc(0, 0, isSpecial ? 8 : 6, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
       });
     }
@@ -348,29 +384,80 @@ export default function Game() {
     }
 
     function drawHUD() {
+      // ── SCORE BOX (Top Left) ──
       ctx.save();
-      // Scoreboard
-      const boxW = 120, boxH = 90; // Bigger for coins
+      const scoreW = 120, scoreH = 50;
+      ctx.translate(20, 20); // Top Left
+      
       ctx.fillStyle = SCORE_BG;
       ctx.strokeStyle = '#22C55E';
-      ctx.lineWidth = 4;
-      ctx.translate(canvas.width - boxW - 20, 20);
-      ctx.rotate(0.03);
-      ctx.beginPath(); ctx.roundRect(0, 0, boxW, boxH, 12); ctx.fill(); ctx.stroke();
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.roundRect(0, 0, scoreW, scoreH, 10); ctx.fill(); ctx.stroke();
       
-      // Points
       ctx.fillStyle = '#4ade80'; ctx.font = '10px "Luckiest Guy"'; ctx.textAlign = 'center';
-      ctx.fillText('SCORE', boxW / 2, 18);
-      ctx.fillStyle = '#fff'; ctx.font = '20px "Luckiest Guy"';
-      ctx.fillText(Math.floor(score), boxW / 2, 40);
+      ctx.fillText('SCORE', scoreW / 2, 18);
+      ctx.fillStyle = '#fff'; ctx.font = '22px "Luckiest Guy"';
+      ctx.fillText(Math.floor(score), scoreW / 2, 40);
+      ctx.restore();
 
-      // Coins
-      ctx.fillStyle = '#FDD835'; ctx.font = '10px "Luckiest Guy"';
-      ctx.fillText('COINS', boxW / 2, 60);
+      // ── COIN DISPLAY (Top Right) ──
+      ctx.save();
+      const coinTextW = ctx.measureText(coinsCollected).width;
+      ctx.translate(canvas.width - 60 - coinTextW, 45); // Top Right
+      
+      // Mini Rotating Coin Icon
+      const spin = Math.sin(frameCount * 0.1);
+      ctx.save();
+      ctx.scale(Math.abs(spin), 1);
+      ctx.fillStyle = '#FDD835'; ctx.strokeStyle = '#FBC02D'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.restore();
+
+      // Coin Count Text
+      ctx.fillStyle = '#fff'; ctx.font = '28px "Luckiest Guy"'; ctx.textAlign = 'left';
+      ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 4;
+      ctx.fillText(coinsCollected, 18, 10);
+      ctx.restore();
+    }
+
+    function drawGameOver() {
+      const bw = 240, bh = 220;
+      const bx = W/2 - bw/2, by = H/2 - bh/2;
+      
+      // The Board
+      ctx.save();
+      ctx.fillStyle = SCORE_BG;
+      ctx.strokeStyle = '#22C55E';
+      ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 20); ctx.fill(); ctx.stroke();
+      
+      // Title
+      ctx.fillStyle = '#FF5252'; ctx.font = '32px "Luckiest Guy"'; ctx.textAlign = 'center';
+      ctx.fillText('GAME OVER', W/2, by + 50);
+      
+      // Score info
       ctx.fillStyle = '#fff'; ctx.font = '20px "Luckiest Guy"';
-      ctx.fillText(coinsCollected, boxW / 2, 80);
+      ctx.fillText(`SCORE: ${Math.floor(score)}`, W/2, by + 95);
+      ctx.fillText(`COINS: ${coinsCollected}`, W/2, by + 125);
+
+      // RETRY BUTTON
+      const btnW = 140, btnH = 45;
+      const btnX = W/2 - btnW/2, btnY = by + 150;
+      
+      // Button Body
+      ctx.fillStyle = '#4ADE80';
+      ctx.strokeStyle = '#166534';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.roundRect(btnX, btnY, btnW, btnH, 10); ctx.fill(); ctx.stroke();
+      
+      // Button Text
+      ctx.fillStyle = '#064e3b'; ctx.font = '18px "Luckiest Guy"';
+      ctx.fillText('RETRY', W/2, btnY + 28);
       
       ctx.restore();
+      
+      // Store button rect for click checking
+      return { x: btnX, y: btnY, w: btnW, h: btnH };
     }
 
     function drawOverlay(lines) {
@@ -382,14 +469,25 @@ export default function Game() {
       });
     }
 
-    function handleJump() {
+    function handleJump(clientX, clientY) {
       if (state === 'idle') { 
         state = 'running'; 
         bgAudio.current.currentTime = 0;
         bgAudio.current.play().catch(e => console.log('Audio play failed:', e));
         return; 
       }
-      if (state === 'dead') { resetGame(); return; }
+      
+      if (state === 'dead') {
+        // Only reset if clicked the RETRY button
+        const btnW = 140, btnH = 45;
+        const btnX = W/2 - btnW/2, btnY = (H/2 - 220/2) + 150;
+        
+        if (clientX >= btnX && clientX <= btnX + btnW && 
+            clientY >= btnY && clientY <= btnY + btnH) {
+          resetGame();
+        }
+        return;
+      }
       
       // Ensure music is playing if it was somehow stalled
       if (bgAudio.current.paused && state === 'running') {
@@ -408,8 +506,12 @@ export default function Game() {
     }
 
     // Input handlers
-    const onClick = (e) => handleJump();
-    const onTouch = (e) => { e.preventDefault(); handleJump(); };
+    const onClick = (e) => handleJump(e.clientX, e.clientY);
+    const onTouch = (e) => { 
+      e.preventDefault(); 
+      const touch = e.touches[0];
+      if (touch) handleJump(touch.clientX, touch.clientY);
+    };
     const onKey = (e) => { if (e.code === 'Space' || e.code === 'ArrowUp') handleJump(); };
 
     canvas.addEventListener('click', onClick);
@@ -564,11 +666,7 @@ export default function Game() {
         { text: 'MYG RUNNER', size: 40, color: '#fff', y: -20 },
         { text: 'Tap to start', size: 20, color: '#4ADE80', y: 30 }
       ]);
-      if (state === 'dead') drawOverlay([
-        { text: 'GAME OVER', size: 40, color: '#FF5252', y: -40 },
-        { text: `Score: ${Math.floor(score)}`, size: 24, color: '#fff', y: 10 },
-        { text: 'Tap to replay', size: 18, color: '#FFEB3B', y: 50 }
-      ]);
+      if (state === 'dead') drawGameOver();
     }
 
     function loop() { update(); draw(); animId = requestAnimationFrame(loop); }
@@ -597,4 +695,9 @@ export default function Game() {
     }}>
       <canvas
         ref={canvasRef}
-        style={{ display: 'block', width: '
+        style={{ display: 'block', width: '100%', height: '100%' }}
+      />
+    </div>
+  );
+}
+
