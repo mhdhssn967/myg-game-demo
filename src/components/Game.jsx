@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import runSprite from '../assets/run.png';
 
 export default function Game() {
   const canvasRef = useRef(null);
@@ -18,7 +19,7 @@ export default function Game() {
     coinAudio.current.volume = 0.5;
     bonusAudio.current.volume = 0.7;
 
-    spriteSheet.current.src = '/src/assets/run.png';
+    spriteSheet.current.src = runSprite;
     spriteSheet.current.onload = () => {
       spriteLoaded.current = true;
     };
