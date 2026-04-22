@@ -6,7 +6,6 @@ export default function Game() {
   const spriteSheet = useRef(new Image());
   const spriteLoaded = useRef(false);
   
-  // Audio refs moved to top-level to fix Hook error
   const bgAudio = useRef(new Audio('/sounds/bg.mp3'));
   const jumpAudio = useRef(new Audio('/sounds/jump.mp3'));
   const coinAudio = useRef(new Audio('/sounds/coin.mp3'));
@@ -22,14 +21,11 @@ export default function Game() {
     yayAudio.current.volume = 0.8;
 
     spriteSheet.current.src = runSprite;
-    spriteSheet.current.onload = () => {
-      spriteLoaded.current = true;
-    };
+    spriteSheet.current.onload = () => { spriteLoaded.current = true; };
 
-    // Interaction Unlocker for mobile audio policies
     const unlockAudio = () => {
       bgAudio.current.play().then(() => {
-        if (state === 'idle') bgAudio.current.pause(); // Just unlock, don't start yet if idle
+        if (state === 'idle') bgAudio.current.pause();
       }).catch(() => {});
       window.removeEventListener('click', unlockAudio);
       window.removeEventListener('touchstart', unlockAudio);
@@ -46,12 +42,10 @@ export default function Game() {
     let charY = GROUND_Y - CHAR_SIZE / 2;
 
     const updateSize = () => {
-      // ✅ Use window dimensions directly — not container
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
       W = canvas.width;
       H = canvas.height;
-      
       const oldGround = GROUND_Y;
       GROUND_Y = H - 120;
       if (oldGround > 0 && Math.abs(charY - (oldGround - CHAR_SIZE / 2)) < 2) {
@@ -60,182 +54,305 @@ export default function Game() {
         charY = GROUND_Y - CHAR_SIZE / 2;
       }
     };
-
     window.addEventListener('resize', updateSize);
     updateSize();
 
-    // ── Palette ──────────────────────────────────────────────────────────
-    const SKY_TOP = '#38BDF8', SKY_MID = '#7DD3FC', SKY_BOT = '#BAE6FD';
-    const MTN_FAR = '#7DC8A8', MTN_MID = '#52B25A', MTN_NEAR = '#3DA84A';
-    const TREE_DARK = '#1A6B2F', TREE_MID_C = '#228B38', TREE_LITE = '#2ECC50';
-    const GROUND_T = '#22c55e', GROUND_B = '#8b4513';
-    const SCORE_BG = 'rgba(93, 64, 55, 0.9)'; // Brown scoreboard
+    // ── Cyberpunk Palette ─────────────────────────────────────────────────
+    const SKY_TOP    = '#03010a';   // near-black deep space
+    const SKY_MID    = '#0a0418';   // dark purple-navy
+    const SKY_BOT    = '#120830';   // slightly lighter purple at horizon
+    const GROUND_T   = '#1a0d00';   // dark burnt orange ground strip
+    const GROUND_B   = '#0d0700';   // near-black ground fill
+    const NEON_ORG   = '#ff6b00';   // myG orange
+    const NEON_PRP   = '#9b30ff';   // cyberpunk purple
+    const SCORE_BG   = 'rgba(10, 5, 20, 0.92)';
 
     // ── Layout CONSTANTS ──────────────────────────────────────────────────
     const CHAR_X = W * 0.25;
-    const GRAVITY = 0.2; // Even slower, extremely floaty
-    const JUMP_VEL = -9; // Adjusted so the max height stays exactly the same
+    const GRAVITY = 0.4;
+    const JUMP_VEL = -11;
     const MAX_JUMPS = 2;
 
-    // Sprite Settings
     const horizontalFrames = 4;
-    const verticalFrames = 6;
     const totalFrames = 21;
-    const frameW = 768; 
+    const frameW = 768;
     const frameH = 448;
 
     // ── State ─────────────────────────────────────────────────────────────
     let state = 'idle';
     let score = 0, bestScore = 0, frameCount = 0;
-    let speed = 3; // Slightly increased for responsiveness on mobile
+    let speed = 6;
     let velY = 0, onGround = true, jumpCount = 0;
     let obstacles = [], nextObstacleIn = 90;
     let coins = [], coinsCollected = 0;
     let lastMilestone = 0;
     let milestoneText = '', milestoneTimer = 0;
     let particles = [], floaters = [];
-    let scrollFar = 0, scrollMid = 0, scrollNear = 0, scrollTrees = 0;
+    let scrollFar = 0, scrollMid = 0, scrollNear = 0, scrollFore = 0;
     let animId;
 
-    // ── Generate terrain ──────────────────────────────────────────────────
-    function genMountains(count, totalW, maxH, minH) {
+    // ── Generate buildings ────────────────────────────────────────────────
+    function genBuildings(count, totalW, minH, maxH, minWid, maxWid) {
       return Array.from({ length: count }, (_, i) => ({
-        x: (i / count) * totalW,
+        x: (i / count) * totalW + Math.random() * (totalW / count),
         h: minH + Math.random() * (maxH - minH),
-        w: (totalW / count) * 1.5 + Math.random() * 50,
-      }));
-    }
-    function genTrees(count, totalW, scale, spread) {
-      return Array.from({ length: count }, (_, i) => ({
-        x: (i / count) * totalW + Math.random() * spread - spread / 2,
-        scale: scale * (0.8 + Math.random() * 0.4),
-        variant: Math.floor(Math.random() * 3),
+        w: minWid + Math.random() * (maxWid - minWid),
+        glowColor: Math.random() > 0.5 ? NEON_ORG : NEON_PRP,
+        hasAntenna: Math.random() > 0.55,
+        windowCols: Math.floor(Math.random() * 3), // 0=none, 1=sparse, 2=medium
+        windowOffset: Math.random(),
       }));
     }
 
-    const clouds = [
-      { x: 400, y: 100, r: 60 }, { x: 900, y: 150, r: 80 }, { x: 1500, y: 120, r: 70 },
-      { x: 2200, y: 80, r: 90 }, { x: 3000, y: 140, r: 65 },
-    ];
-    // Create base terrain dimensions
-    const WORLD_W = 2000;
-    const mtnFar  = genMountains(8, WORLD_W * 4, 300, 200);
-    const mtnMid  = genMountains(10, WORLD_W * 3, 200, 150);
-    const mtnNear = genMountains(12, WORLD_W * 2, 120, 80);
-    const treesFar  = genTrees(12, WORLD_W * 2.5,  1.2, 50);
-    const treesNear = genTrees(8, WORLD_W * 1.8,  2.0, 30);
+    // ── 4 parallax building layers ────────────────────────────────────────
+    const WORLD_W = 2400;
+    // Layer 1 — farthest ghost silhouettes
+    const bldGhost = genBuildings(18, WORLD_W * 3.5, H * 0.45, H * 0.75, 40, 90);
+    // Layer 2 — far city
+    const bldFar   = genBuildings(20, WORLD_W * 3,   H * 0.35, H * 0.60, 35, 75);
+    // Layer 3 — mid city (windows)
+    const bldMid   = genBuildings(22, WORLD_W * 2.5, H * 0.25, H * 0.50, 28, 60);
+    // Layer 4 — near city (windows + detail)
+    const bldNear  = genBuildings(16, WORLD_W * 2,   H * 0.15, H * 0.38, 22, 48);
 
-    // ── Draw functions ────────────────────────────────────────────────────
+    // Street lights
+    const streetLights = Array.from({ length: 12 }, (_, i) => ({
+      x: (i / 12) * WORLD_W * 2 + Math.random() * 30,
+    }));
+
+    // Neon particles (ambient floating dust)
+    const neonDust = Array.from({ length: 60 }, () => ({
+      x: Math.random() * WORLD_W * 2,
+      y: Math.random() * (H * 0.8),
+      r: 1 + Math.random() * 2.5,
+      color: Math.random() > 0.5 ? NEON_ORG : NEON_PRP,
+      speed: 0.2 + Math.random() * 0.6,
+      phase: Math.random() * Math.PI * 2,
+    }));
+
+    // ── DRAW: Night Sky ───────────────────────────────────────────────────
     function drawSky() {
       const g = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
-      g.addColorStop(0, SKY_TOP); g.addColorStop(0.6, SKY_MID); g.addColorStop(1, SKY_BOT);
-      ctx.fillStyle = g; ctx.fillRect(0, 0, W, GROUND_Y);
+      g.addColorStop(0,   SKY_TOP);
+      g.addColorStop(0.5, SKY_MID);
+      g.addColorStop(1,   SKY_BOT);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, GROUND_Y);
     }
 
-    function drawSun() {
+    // ── DRAW: Moon ────────────────────────────────────────────────────────
+    function drawMoon() {
+      const mx = W * 0.15, my = H * 0.12;
       ctx.save();
-      const rg = ctx.createRadialGradient(W - 100, 100, 10, W - 100, 100, 100);
-      rg.addColorStop(0, 'rgba(255,235,59,0.8)'); rg.addColorStop(1, 'rgba(255,235,59,0)');
-      ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(W - 100, 100, 100, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#FFEB3B'; ctx.beginPath(); ctx.arc(W - 100, 100, 40, 0, Math.PI * 2); ctx.fill();
+      // Outer halo
+      const halo = ctx.createRadialGradient(mx, my, 10, mx, my, 80);
+      halo.addColorStop(0, 'rgba(180,140,255,0.18)');
+      halo.addColorStop(1, 'rgba(180,140,255,0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath(); ctx.arc(mx, my, 80, 0, Math.PI * 2); ctx.fill();
+      // Moon disc
+      ctx.fillStyle = '#c4a9f0';
+      ctx.beginPath(); ctx.arc(mx, my, 28, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ddd0f5';
+      ctx.beginPath(); ctx.arc(mx - 6, my - 5, 22, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
 
-    function drawClouds() {
-      const tw = 4000;
-      const s = ((scrollFar * 0.2) % tw + tw) % tw;
-      [ -s, tw - s ].forEach(offsetX => {
-        clouds.forEach(c => {
-          const cx = offsetX + c.x;
-          if (cx > W + 200 || cx < -200) return;
-          ctx.save(); ctx.globalAlpha = 0.7; ctx.fillStyle = '#fff';
-          [[-c.r*0.6, 0, c.r*0.8], [0, -c.r*0.2, c.r], [c.r*0.6, 0, c.r*0.75]].forEach(([dx, dy, r]) => {
-            ctx.beginPath(); ctx.arc(cx + dx, c.y + dy, r, 0, Math.PI * 2); ctx.fill();
-          });
-          ctx.restore();
-        });
+    // ── DRAW: Stars ───────────────────────────────────────────────────────
+    // Pre-generate star positions once
+    const stars = Array.from({ length: 80 }, () => ({
+      x: Math.random() * 3000, y: Math.random() * (H * 0.55),
+      r: 0.5 + Math.random() * 1.5,
+      alpha: 0.4 + Math.random() * 0.6,
+    }));
+    function drawStars() {
+      const tw = 3000;
+      const s = (scrollFar * 0.05) % tw;
+      ctx.save();
+      stars.forEach(st => {
+        const sx = ((st.x - s) % tw + tw) % tw;
+        if (sx > W + 5) return;
+        ctx.globalAlpha = st.alpha * (0.7 + 0.3 * Math.sin(frameCount * 0.04 + st.phase || 0));
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(sx, st.y, st.r, 0, Math.PI * 2); ctx.fill();
       });
+      ctx.restore();
     }
 
-    function drawMountains(arr, scroll, totalW, color, snowColor, opacity, baseY) {
-      ctx.save(); ctx.globalAlpha = opacity; ctx.fillStyle = color;
+    // ── DRAW: Neon ambient dust particles ─────────────────────────────────
+    function drawNeonDust() {
+      const tw = WORLD_W * 2;
+      ctx.save();
+      neonDust.forEach(p => {
+        const px = ((p.x - scrollFar * 0.3) % tw + tw) % tw;
+        const py = p.y + Math.sin(frameCount * 0.03 + p.phase) * 6;
+        if (px > W + 5) return;
+        ctx.globalAlpha = 0.35 + 0.2 * Math.sin(frameCount * 0.05 + p.phase);
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(px, py, p.r, 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.restore();
+    }
+
+    // ── DRAW: Building layer ──────────────────────────────────────────────
+    function drawBuildings(arr, scroll, totalW, bodyColor, opacity, showWindows, showNeon) {
       const s = (scroll % totalW + totalW) % totalW;
-      // Draw 3 layers for seamless wrapping
-      [ -s - totalW, -s, totalW - s ].forEach(offsetX => {
-        arr.forEach(m => {
-          const mx = offsetX + m.x - m.w / 2;
-          if (mx > W + m.w || mx < -m.w) return;
-          ctx.beginPath(); ctx.moveTo(mx, baseY); ctx.lineTo(mx + m.w / 2, baseY - m.h); ctx.lineTo(mx + m.w, baseY); ctx.closePath(); ctx.fill();
-          if (snowColor) {
-            ctx.fillStyle = snowColor;
-            ctx.beginPath(); ctx.moveTo(mx + m.w*0.4, baseY - m.h*0.8); ctx.lineTo(mx + m.w/2, baseY - m.h); ctx.lineTo(mx + m.w*0.6, baseY - m.h*0.8); ctx.closePath(); ctx.fill();
-            ctx.fillStyle = color;
+      ctx.save();
+      ctx.globalAlpha = opacity;
+
+      [-s - totalW, -s, totalW - s].forEach(offsetX => {
+        arr.forEach(b => {
+          const bx = offsetX + b.x;
+          const by = GROUND_Y - b.h;
+          if (bx > W + b.w || bx + b.w < -10) return;
+
+          // ── Main body ──
+          ctx.globalAlpha = opacity;
+          ctx.fillStyle = bodyColor;
+          ctx.fillRect(bx, by, b.w, b.h);
+
+          // ── Neon top trim ──
+          if (showNeon) {
+            ctx.globalAlpha = opacity * 0.9;
+            ctx.fillStyle = b.glowColor;
+            ctx.fillRect(bx - 1, by, b.w + 2, 3);
+
+            // Glow bloom on top edge
+            ctx.globalAlpha = opacity * 0.25;
+            const topGlow = ctx.createLinearGradient(bx, by - 12, bx, by + 6);
+            topGlow.addColorStop(0, 'rgba(0,0,0,0)');
+            topGlow.addColorStop(1, b.glowColor);
+            ctx.fillStyle = topGlow;
+            ctx.fillRect(bx - 2, by - 12, b.w + 4, 15);
+          }
+
+          // ── Antenna ──
+          if (b.hasAntenna && showNeon) {
+            ctx.globalAlpha = opacity * 0.8;
+            ctx.fillStyle = bodyColor;
+            const aH = 12 + b.w * 0.15;
+            ctx.fillRect(bx + b.w / 2 - 1.5, by - aH, 3, aH);
+            // Blinking tip
+            const blink = Math.sin(frameCount * 0.08 + b.windowOffset * 10) > 0.3;
+            if (blink) {
+              ctx.globalAlpha = opacity * 0.95;
+              ctx.fillStyle = b.glowColor;
+              ctx.beginPath();
+              ctx.arc(bx + b.w / 2, by - aH - 2, 2.5, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+
+          // ── Windows ──
+          if (showWindows && b.windowCols > 0) {
+            const winW = 4, winH = 6;
+            const cols = Math.max(1, Math.floor(b.w / 12));
+            const rows = Math.max(1, Math.floor(b.h / 14));
+            for (let r = 0; r < rows; r++) {
+              for (let c = 0; c < cols; c++) {
+                // Deterministic pseudo-random using offset so it doesn't flicker every frame
+                const lit = ((r * 7 + c * 13 + Math.floor(b.windowOffset * 30)) % 5) !== 0;
+                if (!lit) continue;
+                const wx = bx + 5 + c * 12;
+                const wy = by + 8 + r * 14;
+                // Alternate orange/purple windows
+                const wColor = ((r + c) % 2 === 0) ? NEON_ORG : NEON_PRP;
+                ctx.globalAlpha = opacity * (0.4 + 0.3 * Math.sin(frameCount * 0.03 + r + c));
+                ctx.fillStyle = wColor;
+                ctx.fillRect(wx, wy, winW, winH);
+              }
+            }
           }
         });
       });
       ctx.restore();
     }
 
-    function drawTrees(arr, scroll, totalW, colors) {
-      const s = (scroll % totalW + totalW) % totalW;
-      [ -s - totalW, -s, totalW - s ].forEach(offsetX => {
-        arr.forEach(t => {
-          const tx = offsetX + t.x;
-          if (tx > W + 100 || tx < -100) return;
-          const ts = 40 * t.scale;
-          ctx.fillStyle = '#5D4037'; ctx.fillRect(tx - ts * 0.1, GROUND_Y - ts * 0.4, ts * 0.2, ts * 0.4);
-          ctx.fillStyle = colors[t.variant];
-          [0, 0.3, 0.6].forEach((offset, i) => {
-            const w = ts * (1 - i * 0.25), h = ts * 0.6, y = GROUND_Y - ts * (0.4 + i * 0.4);
-            ctx.beginPath(); ctx.moveTo(tx - w / 2, y + h); ctx.lineTo(tx, y); ctx.lineTo(tx + w / 2, y + h); ctx.closePath(); ctx.fill();
-          });
+    // ── DRAW: Street lights ───────────────────────────────────────────────
+    function drawStreetLights() {
+      const tw = WORLD_W * 2;
+      const s = (scrollFore % tw + tw) % tw;
+      ctx.save();
+      [-s - tw, -s, tw - s].forEach(offsetX => {
+        streetLights.forEach(l => {
+          const lx = offsetX + l.x;
+          if (lx > W + 10 || lx < -20) return;
+
+          // Pole
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = '#1a1a2e';
+          ctx.fillRect(lx - 2, GROUND_Y - 60, 4, 60);
+          // Arm
+          ctx.fillRect(lx, GROUND_Y - 60, 18, 3);
+          // Lamp glow bloom
+          ctx.globalAlpha = 0.18;
+          const lg = ctx.createRadialGradient(lx + 18, GROUND_Y - 58, 2, lx + 18, GROUND_Y - 58, 28);
+          lg.addColorStop(0, NEON_ORG); lg.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = lg;
+          ctx.beginPath(); ctx.arc(lx + 18, GROUND_Y - 58, 28, 0, Math.PI * 2); ctx.fill();
+          // Lamp bulb
+          ctx.globalAlpha = 0.95;
+          ctx.fillStyle = NEON_ORG;
+          ctx.beginPath(); ctx.arc(lx + 18, GROUND_Y - 58, 4, 0, Math.PI * 2); ctx.fill();
         });
       });
+      ctx.restore();
     }
 
+    // ── DRAW: Ground (cyberpunk) ──────────────────────────────────────────
     function drawGround() {
-      ctx.fillStyle = GROUND_T; ctx.fillRect(0, GROUND_Y, W, 20);
-      // Fills all the way to bottom of the screen (no blue strip underneath)
-      ctx.fillStyle = GROUND_B; ctx.fillRect(0, GROUND_Y + 20, W, H - GROUND_Y);
+      // Main dark ground strip
+      ctx.fillStyle = '#110808';
+      ctx.fillRect(0, GROUND_Y, W, 18);
 
-      // Animated grass detail
-      ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 2;
-      for (let i = 0; i < canvas.width / 40 + 2; i++) {
-        const lx = ((i * 40 - scrollNear) % canvas.width + canvas.width) % canvas.width;
-        ctx.beginPath(); ctx.moveTo(lx, GROUND_Y + 20); ctx.lineTo(lx - 10, GROUND_Y + 50); ctx.stroke();
+      // Orange neon edge line on ground surface
+      ctx.fillStyle = NEON_ORG;
+      ctx.fillRect(0, GROUND_Y, W, 2);
+
+      // Subtle orange glow bloom above ground
+      const groundGlow = ctx.createLinearGradient(0, GROUND_Y - 20, 0, GROUND_Y);
+      groundGlow.addColorStop(0, 'rgba(255,107,0,0)');
+      groundGlow.addColorStop(1, 'rgba(255,107,0,0.12)');
+      ctx.fillStyle = groundGlow;
+      ctx.fillRect(0, GROUND_Y - 20, W, 20);
+
+      // Ground fill
+      ctx.fillStyle = GROUND_B;
+      ctx.fillRect(0, GROUND_Y + 18, W, H - GROUND_Y);
+
+      // Scrolling ground grid lines (perspective streaks)
+      ctx.strokeStyle = 'rgba(255,107,0,0.12)';
+      ctx.lineWidth = 1;
+      const gridSpacing = 60;
+      for (let i = 0; i < W / gridSpacing + 2; i++) {
+        const lx = ((i * gridSpacing - scrollFore * 0.8) % W + W) % W;
+        ctx.beginPath();
+        ctx.moveTo(lx, GROUND_Y + 18);
+        ctx.lineTo(lx - 15, H);
+        ctx.stroke();
       }
     }
 
+    // ── DRAW: Character (unchanged) ───────────────────────────────────────
     function drawCharacter() {
       if (!spriteLoaded.current) return;
-      
-      // Static pose while jumping (frame 5), animate only while running on ground
       let frameIndex = 0;
       if (state === 'running') {
         if (onGround) {
-          frameIndex = Math.floor(frameCount * 0.12) % totalFrames;
+          frameIndex = Math.floor(frameCount * 0.22) % totalFrames;
         } else {
-          frameIndex = 5; // Static jump pose
+          frameIndex = 5;
         }
       }
-      
       const col = frameIndex % horizontalFrames;
       const row = Math.floor(frameIndex / horizontalFrames);
-      
       const aspect = frameW / frameH;
       const drawW = CHAR_SIZE * aspect;
       const drawH = CHAR_SIZE;
 
       ctx.save();
-      // Shifted downwards slightly so the character's feet touch properly
       ctx.translate(CHAR_X, charY + 15);
-
-      // Add dynamic sway while jumping
-      if (!onGround) {
-        // Leans backward going up, forward coming down
-        ctx.rotate(velY * 0.025);
-      }
-      
+      if (!onGround) ctx.rotate(velY * 0.025);
       ctx.drawImage(
         spriteSheet.current,
         col * frameW, row * frameH, frameW, frameH,
@@ -244,57 +361,67 @@ export default function Game() {
       ctx.restore();
     }
 
+    // ── DRAW: Obstacles (cyberpunk spikes/barriers) ───────────────────────
     function drawObstacles() {
       obstacles.forEach(o => {
         const isTall = o.h > 80;
-        
-        // Draw the main body
-        ctx.fillStyle = '#8B5A2B'; 
-        ctx.fillRect(o.x - o.w/2, GROUND_Y - o.h, o.w, o.h);
-        
-        if (isTall) {
-          // Mid lid for stacked look
-          ctx.fillStyle = '#7a4e25'; // slightly darker
-          ctx.fillRect(o.x - o.w/2 - 2, GROUND_Y - o.h/2, o.w + 4, 8);
-          
-          // Extra planks for height
-          ctx.fillStyle = '#5C3A21';
-          ctx.fillRect(o.x - o.w/6, GROUND_Y - o.h + 12, 3, o.h - 12);
-        }
+        ctx.save();
 
-        // Top lid/edge
-        ctx.fillStyle = '#CD853F';
-        ctx.fillRect(o.x - o.w/2 - 4, GROUND_Y - o.h, o.w + 8, 12);
-        
-        // Box vertical planks/stripes detail
-        ctx.fillStyle = '#5C3A21';
-        ctx.fillRect(o.x - o.w/4, GROUND_Y - o.h + 12, 4, o.h - 12);
-        ctx.fillRect(o.x + o.w/4, GROUND_Y - o.h + 12, 4, o.h - 12);
-        
-        // Horizontal nail/line
-        ctx.fillRect(o.x - o.w/2 + 2, GROUND_Y - (isTall ? o.h*0.75 : o.h/2), o.w - 4, 3);
-        if (isTall) ctx.fillRect(o.x - o.w/2 + 2, GROUND_Y - o.h*0.25, o.w - 4, 3);
+        if (isTall) {
+          // Tall barrier — dark metal with orange trim
+          ctx.fillStyle = '#1a0d0d';
+          ctx.fillRect(o.x - o.w / 2, GROUND_Y - o.h, o.w, o.h);
+          // Orange neon top
+          ctx.fillStyle = NEON_ORG;
+          ctx.fillRect(o.x - o.w / 2 - 2, GROUND_Y - o.h, o.w + 4, 4);
+          // Vertical stripe
+          ctx.fillStyle = 'rgba(255,107,0,0.25)';
+          ctx.fillRect(o.x - 2, GROUND_Y - o.h, 4, o.h);
+          // Mid band
+          ctx.fillStyle = NEON_PRP;
+          ctx.fillRect(o.x - o.w / 2 + 2, GROUND_Y - o.h / 2, o.w - 4, 3);
+        } else {
+          // Short spike cluster
+          const spikeCount = Math.max(2, Math.floor(o.w / 18));
+          const spikeW = o.w / spikeCount;
+          for (let i = 0; i < spikeCount; i++) {
+            const sx = o.x - o.w / 2 + i * spikeW + spikeW / 2;
+            // Spike body
+            ctx.fillStyle = '#2a2a3a';
+            ctx.beginPath();
+            ctx.moveTo(sx - spikeW * 0.4, GROUND_Y);
+            ctx.lineTo(sx, GROUND_Y - o.h);
+            ctx.lineTo(sx + spikeW * 0.4, GROUND_Y);
+            ctx.closePath();
+            ctx.fill();
+            // Neon tip
+            ctx.fillStyle = NEON_ORG;
+            ctx.beginPath();
+            ctx.arc(sx, GROUND_Y - o.h, 3, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          // Base plate
+          ctx.fillStyle = '#1a1a2e';
+          ctx.fillRect(o.x - o.w / 2 - 4, GROUND_Y - 10, o.w + 8, 10);
+          ctx.fillStyle = NEON_ORG;
+          ctx.fillRect(o.x - o.w / 2 - 4, GROUND_Y - 10, o.w + 8, 2);
+        }
+        ctx.restore();
       });
     }
 
+    // ── DRAW: Stars helper for coins ──────────────────────────────────────
     function drawStar(cx, cy, spikes, outerRadius, innerRadius, color) {
       let rot = Math.PI / 2 * 3;
-      let x = cx;
-      let y = cy;
-      let step = Math.PI / spikes;
-
+      let x = cx, y = cy;
+      const step = Math.PI / spikes;
       ctx.beginPath();
-      ctx.moveTo(cx, cy - outerRadius)
+      ctx.moveTo(cx, cy - outerRadius);
       for (let i = 0; i < spikes; i++) {
-        x = cx + Math.cos(rot) * outerRadius;
-        y = cy + Math.sin(rot) * outerRadius;
-        ctx.lineTo(x, y)
-        rot += step
-
-        x = cx + Math.cos(rot) * innerRadius;
-        y = cy + Math.sin(rot) * innerRadius;
-        ctx.lineTo(x, y)
-        rot += step
+        x = cx + Math.cos(rot) * outerRadius; y = cy + Math.sin(rot) * outerRadius;
+        ctx.lineTo(x, y); rot += step;
+        x = cx + Math.cos(rot) * innerRadius; y = cy + Math.sin(rot) * innerRadius;
+        ctx.lineTo(x, y); rot += step;
       }
       ctx.lineTo(cx, cy - outerRadius);
       ctx.closePath();
@@ -302,50 +429,36 @@ export default function Game() {
       ctx.fill();
     }
 
+    // ── DRAW: Coins (unchanged logic, kept as-is) ─────────────────────────
     function drawCoins() {
       coins.forEach(c => {
         if (c.collected) return;
         ctx.save();
         ctx.translate(c.x, c.y);
-        
-        // Slower 3D-ish Rotation
-        const spin = Math.sin(frameCount * 0.08); // Slower spin
+        const spin = Math.sin(frameCount * 0.08);
         const w = Math.abs(spin);
-
-        const isSpecial = c.special;
-
-        if (isSpecial) {
-           // SPECIAL STAR VISUALS
-           ctx.scale(w, 1);
-           
-           // Glow
-           const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 30);
-           glow.addColorStop(0, 'rgba(255, 255, 255, 0.8)'); glow.addColorStop(0.5, 'rgba(233, 30, 99, 0.4)'); glow.addColorStop(1, 'rgba(233, 30, 99, 0)');
-           ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, 30, 0, Math.PI * 2); ctx.fill();
-
-           drawStar(0, 0, 5, 18, 9, '#FF4081'); // Outer
-           drawStar(0, 0, 5, 12, 6, '#F8BBD0'); // Inner
-           drawStar(0, 0, 5, 6, 3, '#FFFFFF');  // Core highlight
+        if (c.special) {
+          ctx.scale(w, 1);
+          const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 30);
+          glow.addColorStop(0, 'rgba(255,255,255,0.8)');
+          glow.addColorStop(0.5, 'rgba(233,30,99,0.4)');
+          glow.addColorStop(1, 'rgba(233,30,99,0)');
+          ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, 30, 0, Math.PI * 2); ctx.fill();
+          drawStar(0, 0, 5, 18, 9, '#FF4081');
+          drawStar(0, 0, 5, 12, 6, '#F8BBD0');
+          drawStar(0, 0, 5, 6, 3, '#FFFFFF');
         } else {
-           // NORMAL COIN VISUALS
-           // 3D Shadow Edge
-           if (w < 0.8) {
-             ctx.fillStyle = '#B8860B'; // Dark gold edge
-             ctx.beginPath(); ctx.ellipse(spin * 2, 0, 10 * w, 10, 0, 0, Math.PI * 2); ctx.fill();
-           }
-
-           // Outer Glow
-           const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 15);
-           glow.addColorStop(0, '#FFF176'); glow.addColorStop(1, 'rgba(253, 216, 53, 0)');
-           ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.fill();
-
-           // Main Coin Face
-           ctx.scale(w, 1);
-           ctx.fillStyle = '#FDD835'; ctx.strokeStyle = '#FBC02D'; ctx.lineWidth = 2;
-           ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-           
-           // Inner detail
-           ctx.fillStyle = '#FFEE58'; ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.fill();
+          if (w < 0.8) {
+            ctx.fillStyle = '#B8860B';
+            ctx.beginPath(); ctx.ellipse(spin * 2, 0, 10 * w, 10, 0, 0, Math.PI * 2); ctx.fill();
+          }
+          const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 15);
+          glow.addColorStop(0, '#FFF176'); glow.addColorStop(1, 'rgba(253,216,53,0)');
+          ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.fill();
+          ctx.scale(w, 1);
+          ctx.fillStyle = '#FDD835'; ctx.strokeStyle = '#FBC02D'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = '#FFEE58'; ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.fill();
         }
         ctx.restore();
       });
@@ -358,7 +471,7 @@ export default function Game() {
         ctx.fillStyle = p.color;
         ctx.translate(p.x, p.y);
         ctx.rotate(p.rot);
-        ctx.fillRect(-p.s/2, -p.s/2, p.s, p.s);
+        ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s);
         ctx.restore();
       });
     }
@@ -367,7 +480,8 @@ export default function Game() {
       floaters.forEach(f => {
         ctx.save();
         ctx.globalAlpha = f.alpha;
-        ctx.fillStyle = '#fff'; ctx.font = '24px "Luckiest Guy"';
+        ctx.fillStyle = '#fff';
+        ctx.font = '24px "Luckiest Guy"';
         ctx.textAlign = 'center';
         ctx.fillText(f.text, f.x, f.y);
         ctx.restore();
@@ -378,234 +492,189 @@ export default function Game() {
       for (let i = 0; i < count; i++) {
         const speedMult = isSpecial ? 1.5 : 1;
         particles.push({
-          x, y, 
+          x, y,
           vx: (Math.random() - 0.5) * 8 * speedMult,
           vy: (Math.random() - 0.5) * 10 * speedMult - (isSpecial ? 5 : 2),
-          s: (isSpecial ? 6 + Math.random() * 8 : 3 + Math.random() * 5),
+          s: isSpecial ? 6 + Math.random() * 8 : 3 + Math.random() * 5,
           alpha: 1,
           rot: Math.random() * Math.PI * 2,
           vrot: (Math.random() - 0.5) * 0.4,
-          color: color || (['#FF5252', '#FFEB3B', '#4ADE80', '#40C4FF', '#E040FB'][Math.floor(Math.random() * 5)]),
-          drag: isSpecial ? 0.96 : 0.98
+          color: color || (['#ff6b00', '#9b30ff', '#fff', '#FFD700', '#ff3399'][Math.floor(Math.random() * 5)]),
+          drag: isSpecial ? 0.96 : 0.98,
         });
       }
     }
 
+    // ── DRAW: HUD (cyberpunk reskin) ──────────────────────────────────────
     function drawHUD() {
-      // ── SCORE BOX (Top Left) ──
+      // Score box — top left, dark with orange border
       ctx.save();
       const scoreW = 120, scoreH = 50;
-      ctx.translate(20, 20); // Top Left
-      
+      ctx.translate(20, 20);
       ctx.fillStyle = SCORE_BG;
-      ctx.strokeStyle = '#22C55E';
-      ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.roundRect(0, 0, scoreW, scoreH, 10); ctx.fill(); ctx.stroke();
-      
-      ctx.fillStyle = '#4ade80'; ctx.font = '10px "Luckiest Guy"'; ctx.textAlign = 'center';
-      ctx.fillText('SCORE', scoreW / 2, 18);
+      ctx.strokeStyle = NEON_ORG;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(0, 0, scoreW, scoreH, 8); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = NEON_ORG; ctx.font = '10px "Luckiest Guy"'; ctx.textAlign = 'center';
+      ctx.fillText('SCORE', scoreW / 2, 17);
       ctx.fillStyle = '#fff'; ctx.font = '22px "Luckiest Guy"';
       ctx.fillText(Math.floor(score), scoreW / 2, 40);
       ctx.restore();
 
-      // ── COIN DISPLAY (Top Right) ──
+      // Coin display — top right
       ctx.save();
       const coinTextW = ctx.measureText(coinsCollected).width;
-      ctx.translate(canvas.width - 60 - coinTextW, 45); // Top Right
-      
-      // Mini Rotating Coin Icon
+      ctx.translate(canvas.width - 60 - coinTextW, 45);
       const spin = Math.sin(frameCount * 0.1);
       ctx.save();
       ctx.scale(Math.abs(spin), 1);
       ctx.fillStyle = '#FDD835'; ctx.strokeStyle = '#FBC02D'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.restore();
-
-      // Coin Count Text
       ctx.fillStyle = '#fff'; ctx.font = '28px "Luckiest Guy"'; ctx.textAlign = 'left';
       ctx.fillText(coinsCollected, 18, 10);
       ctx.restore();
     }
 
     function drawGameOver() {
-      const bw = 240, bh = 220;
-      const bx = W/2 - bw/2, by = H/2 - bh/2;
-      
-      // The Board
+      const bw = 260, bh = 230;
+      const bx = W / 2 - bw / 2, by = H / 2 - bh / 2;
       ctx.save();
-      ctx.fillStyle = SCORE_BG;
-      ctx.strokeStyle = '#22C55E';
-      ctx.lineWidth = 6;
-      ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 20); ctx.fill(); ctx.stroke();
-      
-      // Title
-      ctx.fillStyle = '#FF5252'; ctx.font = '32px "Luckiest Guy"'; ctx.textAlign = 'center';
-      ctx.fillText('GAME OVER', W/2, by + 50);
-      
-      // Score info
-      ctx.fillStyle = '#fff'; ctx.font = '20px "Luckiest Guy"';
-      ctx.fillText(`SCORE: ${Math.floor(score)}`, W/2, by + 95);
-      ctx.fillText(`COINS: ${coinsCollected}`, W/2, by + 125);
-
-      // RETRY BUTTON
-      const btnW = 140, btnH = 45;
-      const btnX = W/2 - btnW/2, btnY = by + 150;
-      
-      // Button Body
-      ctx.fillStyle = '#4ADE80';
-      ctx.strokeStyle = '#166534';
+      ctx.fillStyle = 'rgba(3,1,10,0.95)';
+      ctx.strokeStyle = NEON_ORG;
       ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.roundRect(btnX, btnY, btnW, btnH, 10); ctx.fill(); ctx.stroke();
-      
-      // Button Text
-      ctx.fillStyle = '#064e3b'; ctx.font = '18px "Luckiest Guy"';
-      ctx.fillText('RETRY', W/2, btnY + 28);
-      
+      ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 16); ctx.fill(); ctx.stroke();
+      // Purple inner accent line
+      ctx.strokeStyle = NEON_PRP; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.roundRect(bx + 6, by + 6, bw - 12, bh - 12, 12); ctx.stroke();
+
+      ctx.fillStyle = NEON_ORG; ctx.font = '32px "Luckiest Guy"'; ctx.textAlign = 'center';
+      ctx.fillText('GAME OVER', W / 2, by + 52);
+      ctx.fillStyle = '#fff'; ctx.font = '20px "Luckiest Guy"';
+      ctx.fillText(`SCORE: ${Math.floor(score)}`, W / 2, by + 95);
+      ctx.fillText(`COINS: ${coinsCollected}`, W / 2, by + 125);
+
+      const btnW = 150, btnH = 46;
+      const btnX = W / 2 - btnW / 2, btnY = by + 155;
+      ctx.fillStyle = '#1a0800';
+      ctx.strokeStyle = NEON_ORG; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(btnX, btnY, btnW, btnH, 8); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = NEON_ORG; ctx.font = '18px "Luckiest Guy"';
+      ctx.fillText('RETRY', W / 2, btnY + 29);
       ctx.restore();
-      
-      // Store button rect for click checking
       return { x: btnX, y: btnY, w: btnW, h: btnH };
     }
 
     function drawOverlay(lines) {
       const bh = lines.length * 50 + 20;
-      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, H/2 - bh/2, canvas.width, bh);
+      ctx.fillStyle = 'rgba(3,1,15,0.75)';
+      ctx.fillRect(0, H / 2 - bh / 2, W, bh);
       lines.forEach(({ text, size, color, y }) => {
         ctx.fillStyle = color; ctx.font = `${size}px "Luckiest Guy"`; ctx.textAlign = 'center';
-        ctx.fillText(text, canvas.width / 2, H / 2 + y);
+        ctx.fillText(text, W / 2, H / 2 + y);
       });
     }
 
     function handleJump(clientX, clientY) {
-      if (state === 'idle') { 
-        state = 'running'; 
+      if (state === 'idle') {
+        state = 'running';
         bgAudio.current.currentTime = 0;
-        bgAudio.current.play().catch(e => console.log('Audio play failed:', e));
-        return; 
+        bgAudio.current.play().catch(() => {});
+        return;
       }
-      
       if (state === 'dead') {
-        // Only reset if clicked the RETRY button
-        const btnW = 140, btnH = 45;
-        const btnX = W/2 - btnW/2, btnY = (H/2 - 220/2) + 150;
-        
-        if (clientX >= btnX && clientX <= btnX + btnW && 
+        const btnW = 150, btnH = 46;
+        const btnX = W / 2 - btnW / 2, btnY = (H / 2 - 230 / 2) + 155;
+        if (clientX >= btnX && clientX <= btnX + btnW &&
             clientY >= btnY && clientY <= btnY + btnH) {
           resetGame();
         }
         return;
       }
-      
-      // Ensure music is playing if it was somehow stalled
       if (bgAudio.current.paused && state === 'running') {
         bgAudio.current.play().catch(() => {});
       }
-
-      if (jumpCount < MAX_JUMPS) { 
-        velY = JUMP_VEL; 
-        onGround = false; 
-        jumpCount++; 
-        
-        // Play jump sound
+      if (jumpCount < MAX_JUMPS) {
+        velY = JUMP_VEL; onGround = false; jumpCount++;
         jumpAudio.current.currentTime = 0;
-        jumpAudio.current.play().catch(e => console.log('Jump sound failed:', e));
+        jumpAudio.current.play().catch(() => {});
       }
     }
 
-    // Input handlers
     const onClick = (e) => handleJump(e.clientX, e.clientY);
-    const onTouch = (e) => { 
-      e.preventDefault(); 
+    const onTouch = (e) => {
+      e.preventDefault();
       const touch = e.touches[0];
       if (touch) handleJump(touch.clientX, touch.clientY);
     };
     const onKey = (e) => { if (e.code === 'Space' || e.code === 'ArrowUp') handleJump(); };
-
     canvas.addEventListener('click', onClick);
     canvas.addEventListener('touchstart', onTouch);
     document.addEventListener('keydown', onKey);
 
     function resetGame() {
-      score = 0; frameCount = 0; speed = 2; // Start at very slow constant
+      score = 0; frameCount = 0; speed = 2;
       charY = GROUND_Y - CHAR_SIZE; velY = 0; onGround = true; jumpCount = 0;
-      obstacles = []; nextObstacleIn = 90; coins = []; coinsCollected = 0; 
+      obstacles = []; nextObstacleIn = 90; coins = []; coinsCollected = 0;
       lastMilestone = 0; milestoneTimer = 0;
       particles = []; floaters = []; state = 'running';
-      
-      // Restart background music
       bgAudio.current.currentTime = 0;
-      bgAudio.current.play().catch(e => console.log('Audio play failed:', e));
+      bgAudio.current.play().catch(() => {});
     }
 
     function update(dtScale) {
       if (state !== 'running') return;
       frameCount += dtScale; score += 0.1 * dtScale;
-      
+
       const move = speed * dtScale;
-      scrollFar += move * 0.2; scrollMid += move * 0.4;
-      scrollNear += move * 0.7; scrollTrees += move;
+      scrollFar  += move * 0.15;
+      scrollMid  += move * 0.35;
+      scrollNear += move * 0.65;
+      scrollFore += move;
 
       velY += GRAVITY * dtScale; charY += velY * dtScale;
-      if (charY >= GROUND_Y - CHAR_SIZE/2) {
-        charY = GROUND_Y - CHAR_SIZE/2; velY = 0; onGround = true; jumpCount = 0;
+      if (charY >= GROUND_Y - CHAR_SIZE / 2) {
+        charY = GROUND_Y - CHAR_SIZE / 2; velY = 0; onGround = true; jumpCount = 0;
       } else {
         onGround = false;
       }
 
       nextObstacleIn -= dtScale;
       if (nextObstacleIn <= 0) {
-        const isTall = Math.random() > 0.7; // 30% chance for a tall obstacle
+        const isTall = Math.random() > 0.7;
         const h = isTall ? (110 + Math.random() * 40) : (45 + Math.random() * 30);
         const w = isTall ? (40 + Math.random() * 20) : (30 + Math.random() * 20);
         const ox = W + 100;
-
         obstacles.push({ x: ox, w, h });
-        
-        // Spawn coins in an arc over the obstacle
         const coinCount = isTall ? 5 : 3;
         for (let i = 0; i < coinCount; i++) {
           const angle = (i / (coinCount - 1)) * Math.PI;
-          const cx = ox + Math.cos(angle + Math.PI) * 90; // Wider arc
+          const cx = ox + Math.cos(angle + Math.PI) * 90;
           const cy = GROUND_Y - h - 70 - Math.sin(angle) * 70;
           coins.push({ x: cx, y: cy, collected: false });
         }
-
-        // Wide gap for safety
         nextObstacleIn = isTall ? (180 + Math.random() * 100) : (140 + Math.random() * 80);
       }
 
-      // Random ground coins or lines - ONLY if no obstacle is nearby
       if (Math.random() < 0.008 * dtScale && nextObstacleIn > 120) {
         const count = 3 + Math.floor(Math.random() * 4);
         const startX = W + 300;
         const groundType = Math.random() > 0.5;
-        
         const safe = !obstacles.some(o => Math.abs(o.x - startX) < 150);
-        
         if (safe) {
           for (let i = 0; i < count; i++) {
-            coins.push({ 
-              x: startX + i * 40, 
-              y: groundType ? GROUND_Y - 30 : GROUND_Y - 120, 
-              collected: false 
-            });
+            coins.push({ x: startX + i * 40, y: groundType ? GROUND_Y - 30 : GROUND_Y - 120, collected: false });
           }
         }
       }
 
-      // Special Coin Spawn
       if (Math.random() < 0.002 * dtScale && !coins.some(c => c.special)) {
-        coins.push({ 
-          x: W + 100, 
-          y: GROUND_Y - 200 - Math.random() * 100, 
-          special: true, collected: false 
-        });
+        coins.push({ x: W + 100, y: GROUND_Y - 200 - Math.random() * 100, special: true, collected: false });
       }
 
       coins.forEach(c => c.x -= move);
       coins = coins.filter(c => c.x > -100 && !c.collected);
 
-      // Coin collection
       coins.forEach(c => {
         if (!c.collected) {
           const dx = Math.abs(CHAR_X - c.x);
@@ -614,55 +683,47 @@ export default function Game() {
           if (dx < range && dy < range) {
             c.collected = true;
             if (c.special) {
-              coinsCollected += 10;
-              score += 100;
-              spawnParticles(c.x, c.y, null, 50, true); // BIG multi-color confetti
+              coinsCollected += 10; score += 100;
+              spawnParticles(c.x, c.y, null, 50, true);
               floaters.push({ x: c.x, y: c.y, text: '+10', alpha: 1 });
               bonusAudio.current.currentTime = 0;
-              bonusAudio.current.play().catch(e => {});
+              bonusAudio.current.play().catch(() => {});
             } else {
-              coinsCollected++;
-              score += 10;
+              coinsCollected++; score += 10;
               spawnParticles(c.x, c.y, '#FFEE58');
               coinAudio.current.currentTime = 0;
-              coinAudio.current.play().catch(e => {});
+              coinAudio.current.play().catch(() => {});
             }
           }
         }
       });
 
-      // Milestone Celebration
       if (coinsCollected > 0 && Math.floor(coinsCollected / 100) > lastMilestone) {
         lastMilestone = Math.floor(coinsCollected / 100);
         milestoneText = `${lastMilestone * 100} COINS!`;
         milestoneTimer = 120;
-        for(let i=0; i<3; i++) spawnParticles(W/2 + (i-1)*50, H/2, null, 40, true);
+        for (let i = 0; i < 3; i++) spawnParticles(W / 2 + (i - 1) * 50, H / 2, null, 40, true);
         yayAudio.current.currentTime = 0;
         yayAudio.current.play().catch(() => {});
       }
-
       if (milestoneTimer > 0) milestoneTimer -= dtScale;
 
-      // Update particles & floaters
       particles.forEach(p => {
         p.vx *= (p.drag || 1);
-        p.x += p.vx * dtScale; p.y += p.vy * dtScale; p.vy += 0.15 * dtScale;
-        p.alpha -= 0.015 * dtScale; p.rot += p.vrot * dtScale;
+        p.x += p.vx * dtScale; p.y += p.vy * dtScale;
+        p.vy += 0.25 * dtScale;
+        p.alpha -= 0.02 * dtScale; p.rot += p.vrot * dtScale;
       });
       particles = particles.filter(p => p.alpha > 0);
-
-      floaters.forEach(f => {
-        f.y -= 1.5 * dtScale;
-        f.alpha -= 0.02 * dtScale;
-      });
+      floaters.forEach(f => { f.y -= 1.5 * dtScale; f.alpha -= 0.02 * dtScale; });
       floaters = floaters.filter(f => f.alpha > 0);
       obstacles.forEach(o => o.x -= move);
       obstacles = obstacles.filter(o => o.x > -100);
 
       if (obstacles.some(o => {
         const dx = Math.abs(CHAR_X - o.x);
-        const dy = Math.abs(charY - (GROUND_Y - o.h/2));
-        return dx < (CHAR_SIZE*0.25 + o.w/2) && dy < (CHAR_SIZE*0.35 + o.h/2);
+        const dy = Math.abs(charY - (GROUND_Y - o.h / 2));
+        return dx < (CHAR_SIZE * 0.25 + o.w / 2) && dy < (CHAR_SIZE * 0.35 + o.h / 2);
       })) {
         state = 'dead';
         bgAudio.current.pause();
@@ -671,45 +732,67 @@ export default function Game() {
     }
 
     function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawSky(); drawSun(); drawClouds();
-      drawMountains(mtnFar,  scrollFar,  WORLD_W * 4, MTN_FAR,  '#e0f2fe', 0.4,  GROUND_Y);
-      drawMountains(mtnMid,  scrollMid,  WORLD_W * 3, MTN_MID,  '#dcfce7', 0.6,  GROUND_Y);
-      drawMountains(mtnNear, scrollNear, WORLD_W * 2, MTN_NEAR, null,      0.9,  GROUND_Y);
-      drawTrees(treesFar, scrollFar * 1.5, WORLD_W * 2.5, [TREE_DARK, TREE_MID_C, TREE_LITE]);
-      drawTrees(treesNear, scrollTrees, WORLD_W * 1.8, [TREE_MID_C, TREE_LITE, TREE_DARK]);
-      drawGround(); drawObstacles(); drawCoins(); drawParticles(); drawFloaters(); drawCharacter(); drawHUD();
+      ctx.clearRect(0, 0, W, H);
 
+      // ── Night sky ──
+      drawSky();
+      drawStars();
+      drawMoon();
+      drawNeonDust();
+
+      // ── Parallax building layers: farthest → nearest ──
+      // Ghost silhouettes — very dark, near-black
+      drawBuildings(bldGhost, scrollFar * 0.15, WORLD_W * 3.5, '#07040f', 0.55, false, false);
+      // Far city — dark purple, no windows
+      drawBuildings(bldFar,   scrollFar * 0.3,  WORLD_W * 3,   '#0d0820', 0.70, false, true);
+      // Mid city — slightly lighter, sparse windows
+      drawBuildings(bldMid,   scrollMid * 0.6,  WORLD_W * 2.5, '#120d26', 0.85, true,  true);
+      // Near city — visible detail, full windows
+      drawBuildings(bldNear,  scrollNear,        WORLD_W * 2,   '#1a0d18', 0.95, true,  true);
+
+      // ── Ground & street ──
+      drawStreetLights();
+      drawGround();
+
+      // ── Game objects ──
+      drawObstacles();
+      drawCoins();
+      drawParticles();
+      drawFloaters();
+      drawCharacter();
+      drawHUD();
+
+      // ── Overlays ──
       if (state === 'idle') drawOverlay([
-        { text: 'MYG RUNNER', size: 40, color: '#fff', y: -20 },
-        { text: 'Tap to start', size: 20, color: '#4ADE80', y: 30 }
+        { text: 'MYG RUNNER', size: 42, color: NEON_ORG, y: -24 },
+        { text: 'Tap to start', size: 20, color: '#c084fc', y: 28 },
       ]);
       if (state === 'dead') drawGameOver();
 
       if (milestoneTimer > 0) {
         ctx.save();
         ctx.globalAlpha = Math.min(1, milestoneTimer / 20);
-        ctx.fillStyle = '#FFEB3B'; ctx.font = '50px "Luckiest Guy"';
+        ctx.fillStyle = NEON_ORG; ctx.font = '50px "Luckiest Guy"';
         ctx.textAlign = 'center'; ctx.strokeStyle = '#000'; ctx.lineWidth = 6;
-        ctx.strokeText(milestoneText, W/2, H/2 - 50);
-        ctx.fillText(milestoneText, W/2, H/2 - 50);
+        ctx.strokeText(milestoneText, W / 2, H / 2 - 50);
+        ctx.fillText(milestoneText, W / 2, H / 2 - 50);
         ctx.restore();
       }
     }
 
     let lastTime = 0;
-    function loop(now) { 
+    function loop(now) {
       const dt = lastTime ? (now - lastTime) / 16.67 : 1;
       lastTime = now;
-      update(Math.min(2, dt)); // Clamp dt to avoid huge jumps
-      draw(); 
-      animId = requestAnimationFrame(loop); 
+      update(Math.min(2, dt));
+      draw();
+      animId = requestAnimationFrame(loop);
     }
-    animId = requestAnimationFrame(loop); 
+    animId = requestAnimationFrame(loop);
 
     return () => {
       cancelAnimationFrame(animId);
-      bgAudio.current.pause(); // Clean up audio on exit
+      bgAudio.current.pause();
       canvas.removeEventListener('click', onClick);
       canvas.removeEventListener('touchstart', onTouch);
       document.removeEventListener('keydown', onKey);
@@ -718,21 +801,8 @@ export default function Game() {
   }, []);
 
   return (
-    // ✅ position: fixed + inset: 0 guarantees true full-screen on mobile
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: '#030712',
-      overflow: 'hidden',
-    }}>
-      <canvas
-        ref={canvasRef}
-        style={{ display: 'block', width: '100%', height: '100%' }}
-      />
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: '#03010a', overflow: 'hidden' }}>
+      <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
     </div>
   );
 }
-
