@@ -368,43 +368,83 @@ export default function Game() {
         ctx.save();
 
         if (isTall) {
-          // Tall barrier — dark metal with orange trim
-          ctx.fillStyle = '#1a0d0d';
+          // Glow effect for the whole barrier
+          ctx.shadowBlur = 15;
+          ctx.shadowColor = NEON_ORG;
+          
+          // Tall barrier — dark metal with more contrast
+          ctx.fillStyle = '#221122'; // Slightly purplish dark gray for better visibility
           ctx.fillRect(o.x - o.w / 2, GROUND_Y - o.h, o.w, o.h);
-          // Orange neon top
+          
+          // Reset shadow for inner details to avoid mess
+          ctx.shadowBlur = 0;
+          
+          // Neon border/outline
+          ctx.strokeStyle = NEON_ORG;
+          ctx.lineWidth = 2;
+          ctx.strokeRect(o.x - o.w / 2, GROUND_Y - o.h, o.w, o.h);
+
+          // Orange neon top - with intense glow
+          ctx.save();
+          ctx.shadowBlur = 20;
+          ctx.shadowColor = NEON_ORG;
           ctx.fillStyle = NEON_ORG;
-          ctx.fillRect(o.x - o.w / 2 - 2, GROUND_Y - o.h, o.w + 4, 4);
-          // Vertical stripe
-          ctx.fillStyle = 'rgba(255,107,0,0.25)';
-          ctx.fillRect(o.x - 2, GROUND_Y - o.h, 4, o.h);
-          // Mid band
+          ctx.fillRect(o.x - o.w / 2 - 2, GROUND_Y - o.h, o.w + 4, 6);
+          ctx.restore();
+
+          // Vertical stripe - brighter
+          ctx.fillStyle = 'rgba(255,107,0,0.4)';
+          ctx.fillRect(o.x - 3, GROUND_Y - o.h, 6, o.h);
+
+          // Mid band - Purple Glow
+          ctx.save();
+          ctx.shadowBlur = 15;
+          ctx.shadowColor = NEON_PRP;
           ctx.fillStyle = NEON_PRP;
-          ctx.fillRect(o.x - o.w / 2 + 2, GROUND_Y - o.h / 2, o.w - 4, 3);
+          ctx.fillRect(o.x - o.w / 2 + 2, GROUND_Y - o.h / 2 - 2, o.w - 4, 5);
+          ctx.restore();
         } else {
           // Short spike cluster
           const spikeCount = Math.max(2, Math.floor(o.w / 18));
           const spikeW = o.w / spikeCount;
+          
           for (let i = 0; i < spikeCount; i++) {
             const sx = o.x - o.w / 2 + i * spikeW + spikeW / 2;
-            // Spike body
-            ctx.fillStyle = '#2a2a3a';
+            
+            // Spike body - more visible gray
+            ctx.fillStyle = '#3a3a4a';
             ctx.beginPath();
-            ctx.moveTo(sx - spikeW * 0.4, GROUND_Y);
+            ctx.moveTo(sx - spikeW * 0.45, GROUND_Y);
             ctx.lineTo(sx, GROUND_Y - o.h);
-            ctx.lineTo(sx + spikeW * 0.4, GROUND_Y);
+            ctx.lineTo(sx + spikeW * 0.45, GROUND_Y);
             ctx.closePath();
             ctx.fill();
-            // Neon tip
+
+            // Glowing outline for spike
+            ctx.strokeStyle = NEON_ORG;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Neon tip - Glowing
+            ctx.save();
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = NEON_ORG;
             ctx.fillStyle = NEON_ORG;
             ctx.beginPath();
-            ctx.arc(sx, GROUND_Y - o.h, 3, 0, Math.PI * 2);
+            ctx.arc(sx, GROUND_Y - o.h, 4, 0, Math.PI * 2);
             ctx.fill();
+            ctx.restore();
           }
-          // Base plate
-          ctx.fillStyle = '#1a1a2e';
+
+          // Base plate - Glowing
+          ctx.save();
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = NEON_ORG;
+          ctx.fillStyle = '#22223a';
           ctx.fillRect(o.x - o.w / 2 - 4, GROUND_Y - 10, o.w + 8, 10);
           ctx.fillStyle = NEON_ORG;
-          ctx.fillRect(o.x - o.w / 2 - 4, GROUND_Y - 10, o.w + 8, 2);
+          ctx.fillRect(o.x - o.w / 2 - 4, GROUND_Y - 10, o.w + 8, 3);
+          ctx.restore();
         }
         ctx.restore();
       });
