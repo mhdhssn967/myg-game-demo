@@ -87,7 +87,7 @@ export default function Game() {
     let coins = [], coinsCollected = 0;
     let lastMilestone = 0;
     let milestoneText = '', milestoneTimer = 0;
-    let particles = [], floaters = [];
+    let particles = [], floaters = [], jumpTrail = [];
     let scrollFar = 0, scrollMid = 0, scrollNear = 0, scrollFore = 0;
     let animId;
 
@@ -516,6 +516,44 @@ export default function Game() {
       });
     }
 
+    function drawJumpTrail() {
+      if (jumpTrail.length < 2) return;
+      ctx.save();
+      // Draw the neon glow first
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = NEON_ORG;
+      ctx.lineWidth = 10;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
+      for (let i = 1; i < jumpTrail.length; i++) {
+        const p1 = jumpTrail[i - 1];
+        const p2 = jumpTrail[i];
+        ctx.beginPath();
+        ctx.strokeStyle = NEON_ORG;
+        ctx.globalAlpha = p2.alpha * 0.6;
+        ctx.lineWidth = 8 * p2.alpha; // Tapering tail
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+
+      // Draw a brighter core
+      ctx.shadowBlur = 0;
+      for (let i = 1; i < jumpTrail.length; i++) {
+        const p1 = jumpTrail[i - 1];
+        const p2 = jumpTrail[i];
+        ctx.beginPath();
+        ctx.strokeStyle = '#fff';
+        ctx.globalAlpha = p2.alpha * 0.4;
+        ctx.lineWidth = 3 * p2.alpha;
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     function drawFloaters() {
       floaters.forEach(f => {
         ctx.save();
@@ -657,7 +695,7 @@ export default function Game() {
       charY = GROUND_Y - CHAR_SIZE; velY = 0; onGround = true; jumpCount = 0;
       obstacles = []; nextObstacleIn = 90; coins = []; coinsCollected = 0;
       lastMilestone = 0; milestoneTimer = 0;
-      particles = []; floaters = []; state = 'running';
+      particles = []; floaters = []; jumpTrail = []; state = 'running';
       bgAudio.current.currentTime = 0;
       bgAudio.current.play().catch(() => {});
     }
@@ -757,6 +795,18 @@ export default function Game() {
       particles = particles.filter(p => p.alpha > 0);
       floaters.forEach(f => { f.y -= 1.5 * dtScale; f.alpha -= 0.02 * dtScale; });
       floaters = floaters.filter(f => f.alpha > 0);
+
+      // ── Jump Trail logic ──
+      if (!onGround) {
+        jumpTrail.push({ x: CHAR_X, y: charY + 15, alpha: 1.0 });
+      }
+      jumpTrail.forEach(t => {
+        t.x -= move; // Trail moves with world
+        t.alpha -= 0.03 * dtScale;
+      });
+      jumpTrail = jumpTrail.filter(t => t.alpha > 0 && t.x > -50);
+      if (jumpTrail.length > 25) jumpTrail.shift();
+
       obstacles.forEach(o => o.x -= move);
       obstacles = obstacles.filter(o => o.x > -100);
 
@@ -795,6 +845,7 @@ export default function Game() {
       drawGround();
 
       // ── Game objects ──
+      drawJumpTrail();
       drawObstacles();
       drawCoins();
       drawParticles();
