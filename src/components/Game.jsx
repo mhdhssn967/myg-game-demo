@@ -683,11 +683,20 @@ export default function Game() {
 
     function handleJump(clientX, clientY) {
       if (state === 'idle') {
-        // Request fullscreen on first interaction
+        // Aggressive Fullscreen Request (Like an App)
         const docEl = document.documentElement;
-        if (docEl.requestFullscreen) docEl.requestFullscreen().catch(() => {});
-        else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen().catch(() => {});
-        else if (docEl.msRequestFullscreen) docEl.msRequestFullscreen().catch(() => {});
+        const requestFS = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+        
+        if (requestFS) {
+          requestFS.call(docEl).then(() => {
+            // Attempt to lock orientation to landscape for mobile
+            if (window.screen.orientation && window.screen.orientation.lock) {
+              window.screen.orientation.lock('landscape').catch(() => {});
+            }
+          }).catch(err => {
+            console.warn("Fullscreen request failed:", err);
+          });
+        }
 
         resetGame();
       }
