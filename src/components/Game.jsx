@@ -694,9 +694,15 @@ export default function Game() {
               window.screen.orientation.lock('landscape').catch(() => {});
             }
           }).catch(err => {
-            console.warn("Fullscreen request failed:", err);
+            console.warn("Document FS failed, trying Canvas:", err);
+            // Fallback for some mobile browsers: try the canvas itself
+            const reqCanvas = canvas.requestFullscreen || canvas.webkitRequestFullscreen;
+            if (reqCanvas) reqCanvas.call(canvas).catch(() => {});
           });
         }
+        
+        // Final mobile trick: scroll to top to hide address bars
+        window.scrollTo(0, 0);
 
         resetGame();
       }
@@ -735,7 +741,7 @@ export default function Game() {
     document.addEventListener('keydown', onKey);
 
     function resetGame() {
-      score = 0; frameCount = 0; speed = 6;
+      score = 0; frameCount = 0; speed = 3.6;
       charY = GROUND_Y - CHAR_SIZE; velY = 0; onGround = true; jumpCount = 0;
       obstacles = []; nextObstacleIn = 90; 
       platforms = []; nextPlatformIn = 60;
@@ -751,6 +757,11 @@ export default function Game() {
     function update(dtScale) {
       if (state !== 'running') return;
       frameCount += dtScale; score += 0.1 * dtScale;
+
+      // Gradually increase speed until it is 40% more than the original 6.0 (Max: 8.4)
+      if (speed < 8.4) {
+        speed += 0.0008 * dtScale;
+      }
 
       const move = speed * dtScale;
       scrollFar  += move * 0.15;
