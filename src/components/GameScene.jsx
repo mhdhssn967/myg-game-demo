@@ -1,5 +1,6 @@
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { useTexture } from '@react-three/drei';
 import Ground from './Ground';
 import Character from './Character';
 
@@ -20,13 +21,28 @@ const ParallaxLayer = ({ speed, z, children, width = 200 }) => {
 };
 
 // ─── Cyberpunk Skyscraper ────────────────────────────────────────────────────
-const Skyscraper = ({ x, height, width, color, glowColor, hasAntenna, windowRows }) => (
-  <group position={[x, height / 2, 0]}>
-    {/* Main body */}
-    <mesh>
-      <boxGeometry args={[width, height, 1]} />
-      <meshStandardMaterial color={color} />
-    </mesh>
+const Skyscraper = ({ x, height, width, color, glowColor, hasAntenna, windowRows, logoTexture }) => {
+  const showLogo = useMemo(() => Math.random() > 0.7, []);
+  return (
+    <group position={[x, height / 2, 0]}>
+      {/* Main body */}
+      <mesh>
+        <boxGeometry args={[width, height, 1]} />
+        <meshStandardMaterial color={color} />
+      </mesh>
+      
+      {/* MYG Logo on Building */}
+      {showLogo && logoTexture && (
+        <mesh position={[0, height / 4, 0.51]}>
+          <planeGeometry args={[width * 0.6, width * 0.6]} />
+          <meshStandardMaterial 
+            map={logoTexture} 
+            transparent={true} 
+            emissive="#ffffff" 
+            emissiveIntensity={0.5}
+          />
+        </mesh>
+      )}
     {/* Neon edge trim top */}
     <mesh position={[0, height / 2 + 0.1, 0.1]}>
       <boxGeometry args={[width + 0.2, 0.25, 0.2]} />
@@ -76,7 +92,7 @@ const Skyscraper = ({ x, height, width, color, glowColor, hasAntenna, windowRows
 );
 
 // ─── Building Layer ──────────────────────────────────────────────────────────
-const BuildingLayer = ({ speed, z, yOffset, count, minH, maxH, minW, maxW, color, glowColor, showWindows, width = 200 }) => {
+const BuildingLayer = ({ speed, z, yOffset, count, minH, maxH, minW, maxW, color, glowColor, showWindows, width = 200, logoTexture }) => {
   const buildings = useMemo(
     () =>
       [...Array(count)].map((_, i) => ({
@@ -102,6 +118,7 @@ const BuildingLayer = ({ speed, z, yOffset, count, minH, maxH, minW, maxW, color
           glowColor={b.glowColor}
           hasAntenna={b.hasAntenna}
           windowRows={b.windowRows}
+          logoTexture={logoTexture}
         />
       ))}
     </group>
@@ -223,8 +240,11 @@ const Moon = () => (
 );
 
 // ─── Scene ───────────────────────────────────────────────────────────────────
-const GameScene = ({ isRunning, jumpTrigger }) => (
-  <>
+const GameScene = ({ isRunning, jumpTrigger }) => {
+  const logoTexture = useTexture('/images/myglogo.png');
+
+  return (
+    <>
     <ambientLight intensity={0.15} color="#1a0533" />
     <directionalLight position={[10, 20, 5]} intensity={0.3} color="#9b30ff" />
     {/* Orange neon key light from below-right */}
@@ -265,6 +285,7 @@ const GameScene = ({ isRunning, jumpTrigger }) => (
       color="#130d26" glowColor="#9b30ff"
       showWindows={true}
       width={200}
+      logoTexture={logoTexture}
     />
 
     {/* Layer 4 — Near city, orange + purple mixed neon */}
@@ -274,6 +295,7 @@ const GameScene = ({ isRunning, jumpTrigger }) => (
       color="#1a0d0d" glowColor="#ff6b00"
       showWindows={true}
       width={200}
+      logoTexture={logoTexture}
     />
 
     {/* Street lights — foreground */}

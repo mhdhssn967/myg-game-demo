@@ -6,6 +6,15 @@ export default function Game() {
   const spriteSheet = useRef(new Image());
   const spriteLoaded = useRef(false);
   
+  const logoImg = useRef(new Image());
+  const logoTransImg = useRef(new Image());
+  const logoLoaded = useRef(false);
+  const logoTransLoaded = useRef(false);
+
+  const products = ['iphone', 'fridge', 'washing_machine', 'ac', 'laptop', 'microwave', 'tv', 'headphone', 'viccum_cleaner', 'watch', 'blender'];
+  const productImages = useRef({});
+  const productsLoaded = useRef(0);
+
   const bgAudio = useRef(new Audio('/sounds/bg.mp3'));
   const jumpAudio = useRef(new Audio('/sounds/jump.mp3'));
   const coinAudio = useRef(new Audio('/sounds/coin.mp3'));
@@ -22,6 +31,21 @@ export default function Game() {
 
     spriteSheet.current.src = runSprite;
     spriteSheet.current.onload = () => { spriteLoaded.current = true; };
+
+    logoImg.current.src = '/images/myglogo.png';
+    logoImg.current.onload = () => { logoLoaded.current = true; };
+
+    logoTransImg.current.src = '/images/mygtrans.png';
+    logoTransImg.current.onload = () => { logoTransLoaded.current = true; };
+
+    products.forEach(p => {
+      const img = new Image();
+      img.src = `/images/products/${p}.png`;
+      img.onload = () => {
+        productImages.current[p] = img;
+        productsLoaded.current++;
+      };
+    });
 
     const unlockAudio = () => {
       bgAudio.current.play().then(() => {
@@ -42,12 +66,16 @@ export default function Game() {
     let charY = GROUND_Y - CHAR_SIZE / 2;
 
     const updateSize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      W = canvas.width;
-      H = canvas.height;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+      
+      W = window.innerWidth;
+      H = window.innerHeight;
       const oldGround = GROUND_Y;
-      GROUND_Y = H - 120;
+      GROUND_Y = H - 180;
       if (oldGround > 0 && Math.abs(charY - (oldGround - CHAR_SIZE / 2)) < 2) {
         charY = GROUND_Y - CHAR_SIZE / 2;
       } else if (charY <= 0) {
@@ -84,6 +112,8 @@ export default function Game() {
     let speed = 6;
     let velY = 0, onGround = true, jumpCount = 0;
     let obstacles = [], nextObstacleIn = 90;
+    let platforms = [], nextPlatformIn = 60;
+    let groundSegments = [], nextGroundIn = 0;
     let coins = [], coinsCollected = 0;
     let lastMilestone = 0;
     let milestoneText = '', milestoneTimer = 0;
@@ -101,6 +131,8 @@ export default function Game() {
         hasAntenna: Math.random() > 0.55,
         windowCols: Math.floor(Math.random() * 3), // 0=none, 1=sparse, 2=medium
         windowOffset: Math.random(),
+        showLogo: Math.random() > 0.7,
+        logoType: Math.random() > 0.5 ? 'solid' : 'trans',
       }));
     }
 
@@ -111,9 +143,9 @@ export default function Game() {
     // Layer 2 — far city
     const bldFar   = genBuildings(20, WORLD_W * 3,   H * 0.35, H * 0.60, 35, 75);
     // Layer 3 — mid city (windows)
-    const bldMid   = genBuildings(22, WORLD_W * 2.5, H * 0.25, H * 0.50, 28, 60);
+    const bldMid   = genBuildings(22, WORLD_W * 2.5, H * 0.25, H * 0.50, 60, 120);
     // Layer 4 — near city (windows + detail)
-    const bldNear  = genBuildings(16, WORLD_W * 2,   H * 0.15, H * 0.38, 22, 48);
+    const bldNear  = genBuildings(16, WORLD_W * 2,   H * 0.15, H * 0.38, 80, 180);
 
     // Street lights
     const streetLights = Array.from({ length: 12 }, (_, i) => ({
@@ -263,6 +295,23 @@ export default function Game() {
               }
             }
           }
+
+          // ── Building Logo ──
+          if (b.showLogo && showWindows) {
+            const img = b.logoType === 'trans' ? logoTransImg.current : logoImg.current;
+            const loaded = b.logoType === 'trans' ? logoTransLoaded.current : logoLoaded.current;
+            
+            if (loaded) {
+              ctx.save();
+              ctx.globalAlpha = opacity * 0.9;
+              const logoSize = Math.min(b.w * 0.8, 120);
+              // Neon glow for building logo
+              ctx.shadowBlur = 15;
+              ctx.shadowColor = NEON_ORG;
+              ctx.drawImage(img, bx + b.w/2 - logoSize/2, by + b.h/4, logoSize, logoSize);
+              ctx.restore();
+            }
+          }
         });
       });
       ctx.restore();
@@ -300,37 +349,59 @@ export default function Game() {
     }
 
     // ── DRAW: Ground (cyberpunk) ──────────────────────────────────────────
+    // ── DRAW: Ground (with Gaps) ──────────────────────────────────────────
     function drawGround() {
-      // Main dark ground strip
-      ctx.fillStyle = '#110808';
-      ctx.fillRect(0, GROUND_Y, W, 18);
+      groundSegments.forEach(g => {
+        const gx = g.x;
+        const gw = g.w;
 
-      // Orange neon edge line on ground surface
-      ctx.fillStyle = NEON_ORG;
-      ctx.fillRect(0, GROUND_Y, W, 2);
+        // Main dark ground strip
+        ctx.fillStyle = '#110808';
+        ctx.fillRect(gx, GROUND_Y, gw, 18);
 
-      // Subtle orange glow bloom above ground
-      const groundGlow = ctx.createLinearGradient(0, GROUND_Y - 20, 0, GROUND_Y);
-      groundGlow.addColorStop(0, 'rgba(255,107,0,0)');
-      groundGlow.addColorStop(1, 'rgba(255,107,0,0.12)');
-      ctx.fillStyle = groundGlow;
-      ctx.fillRect(0, GROUND_Y - 20, W, 20);
+        // Orange neon edge line on ground surface
+        ctx.fillStyle = NEON_ORG;
+        ctx.fillRect(gx, GROUND_Y, gw, 2);
 
-      // Ground fill
-      ctx.fillStyle = GROUND_B;
-      ctx.fillRect(0, GROUND_Y + 18, W, H - GROUND_Y);
+        // Subtle orange glow bloom above ground
+        const groundGlow = ctx.createLinearGradient(0, GROUND_Y - 20, 0, GROUND_Y);
+        groundGlow.addColorStop(0, 'rgba(255,107,0,0)');
+        groundGlow.addColorStop(1, 'rgba(255,107,0,0.12)');
+        ctx.fillStyle = groundGlow;
+        ctx.fillRect(gx, GROUND_Y - 20, gw, 20);
 
-      // Scrolling ground grid lines (perspective streaks)
-      ctx.strokeStyle = 'rgba(255,107,0,0.12)';
-      ctx.lineWidth = 1;
-      const gridSpacing = 60;
-      for (let i = 0; i < W / gridSpacing + 2; i++) {
-        const lx = ((i * gridSpacing - scrollFore * 0.8) % W + W) % W;
-        ctx.beginPath();
-        ctx.moveTo(lx, GROUND_Y + 18);
-        ctx.lineTo(lx - 15, H);
-        ctx.stroke();
-      }
+        // Ground fill
+        ctx.fillStyle = GROUND_B;
+        ctx.fillRect(gx, GROUND_Y + 18, gw, H - GROUND_Y);
+
+        // Scrolling ground grid lines (perspective streaks)
+        ctx.strokeStyle = 'rgba(255,107,0,0.12)';
+        ctx.lineWidth = 1;
+        const gridSpacing = 60;
+        for (let i = 0; i < gw / gridSpacing + 2; i++) {
+          const lx = gx + ((i * gridSpacing - scrollFore * 0.8) % gw + gw) % gw;
+          ctx.beginPath();
+          ctx.moveTo(lx, GROUND_Y + 18);
+          ctx.lineTo(lx - 15, H);
+          ctx.stroke();
+        }
+
+        // ── Ground Logos at intervals (Drawn on top of fill) ──
+        if (logoTransLoaded.current) {
+          ctx.save();
+          const logoSize = 100;
+          // One logo per segment if wide enough, or every 800px
+          const count = Math.max(1, Math.floor(gw / 800));
+          for (let j = 0; j < count; j++) {
+            const lx = gx + (j + 0.5) * (gw / count);
+            ctx.globalAlpha = 0.9;
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = NEON_ORG;
+            ctx.drawImage(logoTransImg.current, lx - logoSize / 2, GROUND_Y + 25, logoSize, logoSize);
+          }
+          ctx.restore();
+        }
+      });
     }
 
     // ── DRAW: Character (unchanged) ───────────────────────────────────────
@@ -361,92 +432,49 @@ export default function Game() {
       ctx.restore();
     }
 
-    // ── DRAW: Obstacles (cyberpunk spikes/barriers) ───────────────────────
+    // ── DRAW: Platforms (Floating) ───────────────────────────────────────
+    function drawPlatforms() {
+      platforms.forEach(p => {
+        ctx.save();
+        // Cyberpunk Platform
+        ctx.fillStyle = '#110800'; 
+        ctx.strokeStyle = NEON_ORG;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.roundRect(p.x - p.w / 2, p.y, p.w, 15, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        // Neon Glow
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = NEON_ORG;
+        ctx.fillStyle = NEON_ORG;
+        ctx.fillRect(p.x - p.w / 2, p.y, p.w, 2);
+        ctx.restore();
+      });
+    }
+
+    // ── DRAW: Obstacles (Electronic Products) ───────────────────────────
     function drawObstacles() {
       obstacles.forEach(o => {
-        const isTall = o.h > 80;
-        ctx.save();
-
-        if (isTall) {
-          // Glow effect for the whole barrier
+        const img = productImages.current[o.productType];
+        if (img) {
+          ctx.save();
+          // Glow effect for products
           ctx.shadowBlur = 15;
           ctx.shadowColor = NEON_ORG;
           
-          // Tall barrier — dark metal with more contrast
-          ctx.fillStyle = '#221122'; // Slightly purplish dark gray for better visibility
-          ctx.fillRect(o.x - o.w / 2, GROUND_Y - o.h, o.w, o.h);
-          
-          // Reset shadow for inner details to avoid mess
-          ctx.shadowBlur = 0;
-          
-          // Neon border/outline
-          ctx.strokeStyle = NEON_ORG;
-          ctx.lineWidth = 2;
-          ctx.strokeRect(o.x - o.w / 2, GROUND_Y - o.h, o.w, o.h);
-
-          // Orange neon top - with intense glow
-          ctx.save();
-          ctx.shadowBlur = 20;
-          ctx.shadowColor = NEON_ORG;
-          ctx.fillStyle = NEON_ORG;
-          ctx.fillRect(o.x - o.w / 2 - 2, GROUND_Y - o.h, o.w + 4, 6);
-          ctx.restore();
-
-          // Vertical stripe - brighter
-          ctx.fillStyle = 'rgba(255,107,0,0.4)';
-          ctx.fillRect(o.x - 3, GROUND_Y - o.h, 6, o.h);
-
-          // Mid band - Purple Glow
-          ctx.save();
-          ctx.shadowBlur = 15;
-          ctx.shadowColor = NEON_PRP;
-          ctx.fillStyle = NEON_PRP;
-          ctx.fillRect(o.x - o.w / 2 + 2, GROUND_Y - o.h / 2 - 2, o.w - 4, 5);
+          // Maintain original aspect ratio
+          const aspect = img.width / img.height;
+          const drawW = o.h * aspect;
+          const surfaceY = o.onPlatform ? o.platformY : GROUND_Y;
+          ctx.drawImage(img, o.x - drawW / 2, surfaceY - o.h, drawW, o.h);
           ctx.restore();
         } else {
-          // Short spike cluster
-          const spikeCount = Math.max(2, Math.floor(o.w / 18));
-          const spikeW = o.w / spikeCount;
-          
-          for (let i = 0; i < spikeCount; i++) {
-            const sx = o.x - o.w / 2 + i * spikeW + spikeW / 2;
-            
-            // Spike body - more visible gray
-            ctx.fillStyle = '#3a3a4a';
-            ctx.beginPath();
-            ctx.moveTo(sx - spikeW * 0.45, GROUND_Y);
-            ctx.lineTo(sx, GROUND_Y - o.h);
-            ctx.lineTo(sx + spikeW * 0.45, GROUND_Y);
-            ctx.closePath();
-            ctx.fill();
-
-            // Glowing outline for spike
-            ctx.strokeStyle = NEON_ORG;
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Neon tip - Glowing
-            ctx.save();
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = NEON_ORG;
-            ctx.fillStyle = NEON_ORG;
-            ctx.beginPath();
-            ctx.arc(sx, GROUND_Y - o.h, 4, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-          }
-
-          // Base plate - Glowing
-          ctx.save();
-          ctx.shadowBlur = 10;
-          ctx.shadowColor = NEON_ORG;
-          ctx.fillStyle = '#22223a';
-          ctx.fillRect(o.x - o.w / 2 - 4, GROUND_Y - 10, o.w + 8, 10);
+          // Fallback if image not loaded yet
           ctx.fillStyle = NEON_ORG;
-          ctx.fillRect(o.x - o.w / 2 - 4, GROUND_Y - 10, o.w + 8, 3);
-          ctx.restore();
+          ctx.fillRect(o.x - o.w / 2, GROUND_Y - o.h, o.w, o.h);
         }
-        ctx.restore();
       });
     }
 
@@ -655,10 +683,13 @@ export default function Game() {
 
     function handleJump(clientX, clientY) {
       if (state === 'idle') {
-        state = 'running';
-        bgAudio.current.currentTime = 0;
-        bgAudio.current.play().catch(() => {});
-        return;
+        // Request fullscreen on first interaction
+        const docEl = document.documentElement;
+        if (docEl.requestFullscreen) docEl.requestFullscreen().catch(() => {});
+        else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen().catch(() => {});
+        else if (docEl.msRequestFullscreen) docEl.msRequestFullscreen().catch(() => {});
+
+        resetGame();
       }
       if (state === 'dead') {
         const btnW = 150, btnH = 46;
@@ -672,7 +703,11 @@ export default function Game() {
       if (bgAudio.current.paused && state === 'running') {
         bgAudio.current.play().catch(() => {});
       }
-      if (jumpCount < MAX_JUMPS) {
+      // Allow jump only if on ground OR if already jumping (double jump)
+      // This prevents jumping after walking off an edge into a hole
+      const canJump = onGround || (jumpCount > 0 && jumpCount < MAX_JUMPS);
+
+      if (canJump) {
         velY = JUMP_VEL; onGround = false; jumpCount++;
         jumpAudio.current.currentTime = 0;
         jumpAudio.current.play().catch(() => {});
@@ -691,9 +726,13 @@ export default function Game() {
     document.addEventListener('keydown', onKey);
 
     function resetGame() {
-      score = 0; frameCount = 0; speed = 2;
+      score = 0; frameCount = 0; speed = 6;
       charY = GROUND_Y - CHAR_SIZE; velY = 0; onGround = true; jumpCount = 0;
-      obstacles = []; nextObstacleIn = 90; coins = []; coinsCollected = 0;
+      obstacles = []; nextObstacleIn = 90; 
+      platforms = []; nextPlatformIn = 60;
+      groundSegments = [{ x: 0, w: W * 2 }];
+      nextGroundIn = 0;
+      coins = []; coinsCollected = 0;
       lastMilestone = 0; milestoneTimer = 0;
       particles = []; floaters = []; jumpTrail = []; state = 'running';
       bgAudio.current.currentTime = 0;
@@ -711,19 +750,54 @@ export default function Game() {
       scrollFore += move;
 
       velY += GRAVITY * dtScale; charY += velY * dtScale;
-      if (charY >= GROUND_Y - CHAR_SIZE / 2) {
-        charY = GROUND_Y - CHAR_SIZE / 2; velY = 0; onGround = true; jumpCount = 0;
-      } else {
-        onGround = false;
+      
+      // Vertical Collision Handling
+      let stood = false;
+      if (velY >= 0) {
+        const charBottom = charY + CHAR_SIZE / 2;
+        const charFootX = CHAR_X;
+
+        // Check ground segments
+        groundSegments.forEach(g => {
+          if (charFootX > g.x && charFootX < g.x + g.w) {
+            if (charBottom >= GROUND_Y && charBottom <= GROUND_Y + 25) {
+              charY = GROUND_Y - CHAR_SIZE / 2;
+              velY = 0; onGround = true; jumpCount = 0; stood = true;
+            }
+          }
+        });
+
+        // Check floating platforms
+        if (!stood) {
+          platforms.forEach(p => {
+            if (charFootX > p.x - p.w / 2 && charFootX < p.x + p.w / 2) {
+              if (charBottom >= p.y && charBottom <= p.y + 25) {
+                charY = p.y - CHAR_SIZE / 2;
+                velY = 0; onGround = true; jumpCount = 0; stood = true;
+              }
+            }
+          });
+        }
       }
 
+      if (!stood) onGround = false;
+
+      // Death check (Falling off)
+      if (charY > H + 100) {
+        state = 'dead';
+        bgAudio.current.pause();
+        if (score > bestScore) bestScore = score;
+      }
+
+      /*
       nextObstacleIn -= dtScale;
       if (nextObstacleIn <= 0) {
-        const isTall = Math.random() > 0.7;
-        const h = isTall ? (110 + Math.random() * 40) : (45 + Math.random() * 30);
-        const w = isTall ? (40 + Math.random() * 20) : (30 + Math.random() * 20);
+        const productType = products[Math.floor(Math.random() * products.length)];
+        const isTall = ['fridge', 'washing_machine', 'tv', 'ac', 'vacuum'].includes(productType);
+        const h = isTall ? (140 + Math.random() * 60) : (80 + Math.random() * 40);
+        const w = h * 0.8; // Maintain roughly square/rect aspect
         const ox = W + 100;
-        obstacles.push({ x: ox, w, h });
+        obstacles.push({ x: ox, w, h, productType });
         const coinCount = isTall ? 5 : 3;
         for (let i = 0; i < coinCount; i++) {
           const angle = (i / (coinCount - 1)) * Math.PI;
@@ -733,6 +807,80 @@ export default function Game() {
         }
         nextObstacleIn = isTall ? (180 + Math.random() * 100) : (140 + Math.random() * 80);
       }
+      */
+
+      // Spawn Platforms
+      nextPlatformIn -= dtScale;
+      if (nextPlatformIn <= 0) {
+        const layer = Math.floor(Math.random() * 2); // 0 = mid, 1 = high
+        const py = GROUND_Y - 150 - layer * 140;
+        const pw = 300 + Math.random() * 300; // Longer platforms
+        const px = W + pw;
+        platforms.push({ x: px, y: py, w: pw });
+        
+        // Spawn items on the platform
+        if (Math.random() > 0.4) {
+          const coinCount = 3 + Math.floor(Math.random() * 3);
+          for (let i = 0; i < coinCount; i++) {
+            coins.push({ 
+              x: px - pw/2 + (i + 0.5) * (pw / coinCount), 
+              y: py - 40, 
+              collected: false 
+            });
+          }
+        }
+        
+        // Occasionally spawn a product on a platform (Currently disabled as per your request, but logic is here)
+        /*
+        if (Math.random() > 0.7) {
+          const productType = products[Math.floor(Math.random() * products.length)];
+          const h = 80;
+          const w = h * 0.8;
+          obstacles.push({ x: px, w, h, productType, onPlatform: true, platformY: py });
+        }
+        */
+
+        nextPlatformIn = 120 + Math.random() * 80;
+      }
+
+      // Spawn Ground Segments (Gaps)
+      nextGroundIn -= dtScale;
+      if (nextGroundIn <= 0) {
+        const gw = 600 + Math.random() * 800;
+        const gap = 120 + Math.random() * 220;
+        const gx = W + gap;
+        groundSegments.push({ x: gx, w: gw });
+        
+        // Spawn coins on ground
+        if (Math.random() > 0.2) { // High frequency
+          const coinCount = 4 + Math.floor(Math.random() * 6);
+          for (let i = 0; i < coinCount; i++) {
+            coins.push({ 
+              x: gx + (i + 0.5) * (gw / coinCount), 
+              y: GROUND_Y - 40, 
+              collected: false 
+            });
+          }
+        }
+        
+        nextGroundIn = (gw + gap) / speed;
+      }
+
+      groundSegments.forEach(g => g.x -= move);
+      groundSegments = groundSegments.filter(g => g.x > -g.w);
+
+      platforms.forEach(p => p.x -= move);
+      platforms = platforms.filter(p => p.x > -p.w);
+      
+      // Update obstacles on platforms
+      obstacles.forEach(o => {
+        o.x -= move;
+        if (o.onPlatform) {
+          // Keep it synced with platform vertical height
+          // (Though in this game they are static in Y, so no extra work needed)
+        }
+      });
+      obstacles = obstacles.filter(o => o.x > -100);
 
       if (Math.random() < 0.008 * dtScale && nextObstacleIn > 120) {
         const count = 3 + Math.floor(Math.random() * 4);
@@ -810,15 +958,21 @@ export default function Game() {
       obstacles.forEach(o => o.x -= move);
       obstacles = obstacles.filter(o => o.x > -100);
 
+      /*
       if (obstacles.some(o => {
+        const img = productImages.current[o.productType];
+        const actualW = img ? (o.h * (img.width / img.height)) : o.w;
         const dx = Math.abs(CHAR_X - o.x);
-        const dy = Math.abs(charY - (GROUND_Y - o.h / 2));
-        return dx < (CHAR_SIZE * 0.25 + o.w / 2) && dy < (CHAR_SIZE * 0.35 + o.h / 2);
+        const surfaceY = o.onPlatform ? o.platformY : GROUND_Y;
+        const dy = Math.abs(charY - (surfaceY - o.h / 2));
+        // Use a tighter hitbox for better gameplay
+        return dx < (CHAR_SIZE * 0.2 + actualW * 0.4) && dy < (CHAR_SIZE * 0.3 + o.h * 0.4);
       })) {
         state = 'dead';
         bgAudio.current.pause();
         if (score > bestScore) bestScore = score;
       }
+      */
     }
 
     function draw() {
@@ -845,6 +999,7 @@ export default function Game() {
       drawGround();
 
       // ── Game objects ──
+      drawPlatforms();
       drawJumpTrail();
       drawObstacles();
       drawCoins();
