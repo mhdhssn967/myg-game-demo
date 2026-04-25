@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import runSprite from '../assets/run.png';
+import waveSprite from '../assets/wave.png';
 
 export default function Game() {
   const canvasRef = useRef(null);
@@ -8,11 +9,14 @@ export default function Game() {
   
   const logoImg = useRef(new Image());
   const logoTransImg = useRef(new Image());
+  const waveSheet = useRef(new Image());
   const logoLoaded = useRef(false);
   const logoTransLoaded = useRef(false);
+  const waveLoaded = useRef(false);
 
   const products = ['iphone', 'fridge', 'washing_machine', 'ac', 'laptop', 'microwave', 'tv', 'headphone', 'viccum_cleaner', 'watch', 'blender'];
   const productImages = useRef({});
+  const billboardImages = useRef([]);
   const productsLoaded = useRef(0);
 
   const bgAudio = useRef(new Audio('/sounds/bg.mp3'));
@@ -20,6 +24,7 @@ export default function Game() {
   const coinAudio = useRef(new Audio('/sounds/coin.mp3'));
   const bonusAudio = useRef(new Audio('/sounds/bonus.mp3'));
   const yayAudio = useRef(new Audio('/sounds/yay.mp3'));
+  const lightningAudio = useRef(new Audio('/sounds/lightning.mp3'));
 
   useEffect(() => {
     bgAudio.current.loop = true;
@@ -28,15 +33,19 @@ export default function Game() {
     coinAudio.current.volume = 0.5;
     bonusAudio.current.volume = 0.7;
     yayAudio.current.volume = 0.8;
+    lightningAudio.current.volume = 0.6;
 
     spriteSheet.current.src = runSprite;
     spriteSheet.current.onload = () => { spriteLoaded.current = true; };
 
-    logoImg.current.src = '/images/myglogo.png';
+    logoImg.current.src = '/images/Glogo.png';
     logoImg.current.onload = () => { logoLoaded.current = true; };
 
     logoTransImg.current.src = '/images/mygtrans.png';
     logoTransImg.current.onload = () => { logoTransLoaded.current = true; };
+
+    waveSheet.current.src = waveSprite;
+    waveSheet.current.onload = () => { waveLoaded.current = true; };
 
     products.forEach(p => {
       const img = new Image();
@@ -46,6 +55,12 @@ export default function Game() {
         productsLoaded.current++;
       };
     });
+
+    for (let i = 1; i <= 14; i++) {
+      const img = new Image();
+      img.src = `/images/billboards/story${i}.png`;
+      billboardImages.current.push(img);
+    }
 
     const unlockAudio = () => {
       bgAudio.current.play().then(() => {
@@ -86,11 +101,14 @@ export default function Game() {
     updateSize();
 
     // ── Cyberpunk Palette ─────────────────────────────────────────────────
-    const SKY_TOP    = '#03010a';   // near-black deep space
+    const SKY_TOP    = '#03010a';   // night deep space
     const SKY_MID    = '#0a0418';   // dark purple-navy
-    const SKY_BOT    = '#120830';   // slightly lighter purple at horizon
-    const GROUND_T   = '#1a0d00';   // dark burnt orange ground strip
-    const GROUND_B   = '#0d0700';   // near-black ground fill
+    const SKY_BOT    = '#120830';   // purple horizon
+    
+    const DAY_TOP    = '#1A2980';   // bright blue
+    const DAY_MID    = '#26D0CE';   // cyan
+    const DAY_BOT    = '#74ebd5';   // light teal horizon
+
     const NEON_ORG   = '#ff6b00';   // myG orange
     const NEON_PRP   = '#9b30ff';   // cyberpunk purple
     const SCORE_BG   = 'rgba(10, 5, 20, 0.92)';
@@ -120,6 +138,7 @@ export default function Game() {
     let particles = [], floaters = [], jumpTrail = [];
     let scrollFar = 0, scrollMid = 0, scrollNear = 0, scrollFore = 0;
     let animId;
+    let introTimer = 0; // 0 to 30s
 
     // ── Generate buildings ────────────────────────────────────────────────
     function genBuildings(count, totalW, minH, maxH, minWid, maxWid) {
@@ -131,21 +150,38 @@ export default function Game() {
         hasAntenna: Math.random() > 0.55,
         windowCols: Math.floor(Math.random() * 3), // 0=none, 1=sparse, 2=medium
         windowOffset: Math.random(),
-        showLogo: Math.random() > 0.7,
+        showLogo: Math.random() > 0.4,
         logoType: Math.random() > 0.5 ? 'solid' : 'trans',
+      }));
+    }
+
+    function genBillboards(count, totalW, minY, maxY) {
+      return Array.from({ length: count }, (_, i) => ({
+        x: (i / count) * totalW + Math.random() * (totalW / count),
+        y: minY + Math.random() * (maxY - minY),
+        w: 180 + Math.random() * 260, // Clearer poster size
+        h: 120 + Math.random() * 160,
+        adIndex: Math.floor(Math.random() * 12),
+        floatOff: Math.random() * Math.PI * 2,
+        flicker: Math.random(),
+        glowColor: Math.random() > 0.5 ? NEON_ORG : NEON_PRP
       }));
     }
 
     // ── 4 parallax building layers ────────────────────────────────────────
     const WORLD_W = 2400;
     // Layer 1 — farthest ghost silhouettes
-    const bldGhost = genBuildings(18, WORLD_W * 3.5, H * 0.45, H * 0.75, 40, 90);
+    const bldGhost = genBuildings(8, WORLD_W * 3.5, H * 0.45, H * 0.75, 40, 90);
     // Layer 2 — far city
-    const bldFar   = genBuildings(20, WORLD_W * 3,   H * 0.35, H * 0.60, 35, 75);
+    const bldFar   = genBuildings(10, WORLD_W * 3,   H * 0.35, H * 0.60, 35, 75);
     // Layer 3 — mid city (windows)
-    const bldMid   = genBuildings(22, WORLD_W * 2.5, H * 0.25, H * 0.50, 60, 120);
+    const bldMid   = genBuildings(12, WORLD_W * 2.5, H * 0.25, H * 0.50, 60, 120);
     // Layer 4 — near city (windows + detail)
-    const bldNear  = genBuildings(16, WORLD_W * 2,   H * 0.15, H * 0.38, 80, 180);
+    const bldNear  = genBuildings(8, WORLD_W * 2,   H * 0.15, H * 0.38, 80, 180);
+
+    // Billboards
+    const adsMid  = genBillboards(8, WORLD_W * 2.5, H * 0.2, H * 0.5);
+    const adsNear = genBillboards(6, WORLD_W * 2,   H * 0.1, H * 0.4);
 
     // Street lights
     const streetLights = Array.from({ length: 12 }, (_, i) => ({
@@ -162,31 +198,79 @@ export default function Game() {
       phase: Math.random() * Math.PI * 2,
     }));
 
-    // ── DRAW: Night Sky ───────────────────────────────────────────────────
+    function lerpColor(a, b, t) {
+      const ah = parseInt(a.slice(1), 16),
+            bh = parseInt(b.slice(1), 16),
+            ar = ah >> 16, ag = ah >> 8 & 0xff, ab = ah & 0xff,
+            br = bh >> 16, bg = bh >> 8 & 0xff, bb = bh & 0xff,
+            rr = ar + t * (br - ar),
+            rg = ag + t * (bg - ag),
+            rb = ab + t * (bb - ab);
+      return '#' + ((1 << 24) + (Math.round(rr) << 16) + (Math.round(rg) << 8) + Math.round(rb)).toString(16).slice(1);
+    }
+
+    function getDayPhase() {
+      const ONE_MIN = 3600; // 60s * 60fps
+      const cycle = (frameCount / ONE_MIN) % 2; // 0..1 is Night, 1..2 is Day
+      let t = (cycle < 1) ? 0 : 1;
+      const transitionFrames = 600; // 10s transition
+      const progress = frameCount % ONE_MIN;
+      if (progress > ONE_MIN - transitionFrames) {
+        const factor = (progress - (ONE_MIN - transitionFrames)) / transitionFrames;
+        t = (cycle < 1) ? factor : 1 - factor;
+      }
+      return t;
+    }
+
+    // ── DRAW: Sky Transition ─────────────────────────────────────────────
     function drawSky() {
+      const t = getDayPhase();
+      const top = lerpColor(SKY_TOP, DAY_TOP, t);
+      const mid = lerpColor(SKY_MID, DAY_MID, t);
+      const bot = lerpColor(SKY_BOT, DAY_BOT, t);
+      
       const g = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
-      g.addColorStop(0,   SKY_TOP);
-      g.addColorStop(0.5, SKY_MID);
-      g.addColorStop(1,   SKY_BOT);
+      g.addColorStop(0,   top);
+      g.addColorStop(0.5, mid);
+      g.addColorStop(1,   bot);
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, W, GROUND_Y);
     }
 
-    // ── DRAW: Moon ────────────────────────────────────────────────────────
-    function drawMoon() {
-      const mx = W * 0.15, my = H * 0.12;
+    // ── DRAW: Celestial (Moon/Sun) ────────────────────────────────────────
+    function drawCelestial() {
+      const t = getDayPhase();
+      const mx = W * 0.15;
+      const my = H * 0.12 + (1 - t) * 20; // Slight vertical move
+      const sy = H * 0.12 + t * 20;
+
       ctx.save();
-      // Outer halo
-      const halo = ctx.createRadialGradient(mx, my, 10, mx, my, 80);
-      halo.addColorStop(0, 'rgba(180,140,255,0.18)');
-      halo.addColorStop(1, 'rgba(180,140,255,0)');
-      ctx.fillStyle = halo;
-      ctx.beginPath(); ctx.arc(mx, my, 80, 0, Math.PI * 2); ctx.fill();
-      // Moon disc
-      ctx.fillStyle = '#c4a9f0';
-      ctx.beginPath(); ctx.arc(mx, my, 28, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#ddd0f5';
-      ctx.beginPath(); ctx.arc(mx - 6, my - 5, 22, 0, Math.PI * 2); ctx.fill();
+      
+      // Draw Moon if t < 1
+      if (t < 0.95) {
+        ctx.save();
+        ctx.globalAlpha = 1 - t;
+        const halo = ctx.createRadialGradient(mx, my, 10, mx, my, 80);
+        halo.addColorStop(0, 'rgba(180,140,255,0.2)'); halo.addColorStop(1, 'rgba(180,140,255,0)');
+        ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(mx, my, 80, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#c4a9f0'; ctx.beginPath(); ctx.arc(mx, my, 28, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ddd0f5'; ctx.beginPath(); ctx.arc(mx - 6, my - 5, 22, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+
+      // Draw Sun if t > 0
+      if (t > 0.05) {
+        ctx.save();
+        ctx.globalAlpha = t;
+        const sx = W * 0.85; // Opposite side for sun
+        const halo = ctx.createRadialGradient(sx, sy, 10, sx, sy, 100);
+        halo.addColorStop(0, 'rgba(255,107,0,0.4)'); halo.addColorStop(1, 'rgba(255,107,0,0)');
+        ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(sx, sy, 100, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#FFD700'; ctx.beginPath(); ctx.arc(sx, sy, 35, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#FFF700'; ctx.beginPath(); ctx.arc(sx, sy, 25, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+      
       ctx.restore();
     }
 
@@ -238,10 +322,10 @@ export default function Game() {
           const by = GROUND_Y - b.h;
           if (bx > W + b.w || bx + b.w < -10) return;
 
-          // ── Main body ──
+          // ── Main body (Extends to bottom for depth in gaps) ──
           ctx.globalAlpha = opacity;
           ctx.fillStyle = bodyColor;
-          ctx.fillRect(bx, by, b.w, b.h);
+          ctx.fillRect(bx, by, b.w, H - by);
 
           // ── Neon top trim ──
           if (showNeon) {
@@ -297,9 +381,9 @@ export default function Game() {
           }
 
           // ── Building Logo ──
-          if (b.showLogo && showWindows) {
-            const img = b.logoType === 'trans' ? logoTransImg.current : logoImg.current;
-            const loaded = b.logoType === 'trans' ? logoTransLoaded.current : logoLoaded.current;
+          if (b.showLogo) {
+            const img = logoTransImg.current;
+            const loaded = logoTransLoaded.current;
             
             if (loaded) {
               ctx.save();
@@ -356,12 +440,12 @@ export default function Game() {
         const gw = g.w;
 
         // Main dark ground strip
-        ctx.fillStyle = '#110808';
-        ctx.fillRect(gx, GROUND_Y, gw, 18);
+        ctx.fillStyle = '#0a0505';
+        ctx.fillRect(gx, GROUND_Y, gw, 25);
 
-        // Orange neon edge line on ground surface
+        // Orange neon edge line on ground surface (Thicker for clarity)
         ctx.fillStyle = NEON_ORG;
-        ctx.fillRect(gx, GROUND_Y, gw, 2);
+        ctx.fillRect(gx, GROUND_Y, gw, 8);
 
         // Subtle orange glow bloom above ground
         const groundGlow = ctx.createLinearGradient(0, GROUND_Y - 20, 0, GROUND_Y);
@@ -370,9 +454,9 @@ export default function Game() {
         ctx.fillStyle = groundGlow;
         ctx.fillRect(gx, GROUND_Y - 20, gw, 20);
 
-        // Ground fill
-        ctx.fillStyle = GROUND_B;
-        ctx.fillRect(gx, GROUND_Y + 18, gw, H - GROUND_Y);
+        // Ground fill (Opaque below the platform, gaps remain holes)
+        ctx.fillStyle = '#0a0505';
+        ctx.fillRect(gx, GROUND_Y + 25, gw, H - GROUND_Y);
 
         // Scrolling ground grid lines (perspective streaks)
         ctx.strokeStyle = 'rgba(255,107,0,0.12)';
@@ -404,29 +488,189 @@ export default function Game() {
       });
     }
 
+    function drawBillboards(list, scroll, totalW, alpha = 1) {
+      list.forEach(ad => {
+        const margin = 1000;
+        const x = ((ad.x - scroll + margin) % totalW + totalW) % totalW - margin;
+        if (x < -800 || x > W + 800) return;
+
+        const img = billboardImages.current[ad.adIndex];
+        if (!img || !img.complete) return;
+
+        const floatY = Math.sin(frameCount * 0.02 + ad.floatOff) * 12;
+        const drawY = ad.y + floatY;
+        
+        // Maintain aspect ratio
+        const aspect = img.width / img.height;
+        const h = ad.h;
+        const w = h * aspect;
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        
+        // Flicker effect
+        if (Math.random() > 0.985 && ad.flicker > 0.7) ctx.globalAlpha *= 0.2;
+
+        // Glow
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = ad.glowColor;
+
+        // Frame
+        ctx.fillStyle = '#0a0a1a';
+        ctx.strokeStyle = ad.glowColor;
+        ctx.lineWidth = 3;
+        
+        ctx.beginPath();
+        ctx.roundRect(x - w/2, drawY - h/2, w, h, 6);
+        ctx.fill();
+        ctx.stroke();
+
+        // Image
+        ctx.drawImage(img, x - w/2 + 5, drawY - h/2 + 5, w - 10, h - 10);
+
+        // Support poles (futuristic dual poles)
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = '#1a1a2e';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(x - w/4, drawY + h/2);
+        ctx.lineTo(x - w/4, H);
+        ctx.moveTo(x + w/4, drawY + h/2);
+        ctx.lineTo(x + w/4, H);
+        ctx.stroke();
+
+        ctx.restore();
+      });
+    }
+
+    // ── DRAW: Electrifying Brand Intro ───────────────────────────────────
+    function drawBrandIntro() {
+      const elapsed = introTimer / 60; // seconds
+      if (elapsed > 30) return;
+
+      const alpha = elapsed > 28 ? (30 - elapsed) / 2 : 1;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+
+      const segmentDuration = 3;
+      const segmentIndex = Math.floor(elapsed / segmentDuration);
+      const segmentTime = elapsed % segmentDuration;
+      
+      // ── Lightning Bolts (Only at the start of each segment) ──
+      if (segmentTime < 0.4 && Math.random() > 0.4) {
+        // Play sound occasionally with the bolt
+        if (Math.random() > 0.7) {
+          lightningAudio.current.currentTime = 0;
+          lightningAudio.current.play().catch(() => {});
+        }
+
+        ctx.strokeStyle = NEON_ORG;
+        ctx.lineWidth = 2 + Math.random() * 3;
+        ctx.shadowBlur = 25;
+        ctx.shadowColor = NEON_ORG;
+        ctx.beginPath();
+        let lx = W/2 + (Math.random() - 0.5) * W * 0.8, ly = 0;
+        ctx.moveTo(lx, ly);
+        for (let i = 0; i < 8; i++) {
+          lx += (Math.random() - 0.5) * 120;
+          ly += Math.random() * (H / 8);
+          ctx.lineTo(lx, ly);
+        }
+        ctx.stroke();
+      }
+
+      // ── Text Sequence ──
+      const texts = [
+        { t: 0, d: 3, txt: "myG", sub: "Since 2006", logo: true },
+        { t: 3, d: 3, txt: "THE DIGITAL HUB", sub: "Kerala's No.1 Destination" },
+        { t: 6, d: 3, txt: "150+ SHOWROOMS", sub: "Driven by 1 Vision" },
+        { t: 9, d: 3, txt: "SOMETHING EPIC", sub: "Is Coming..." },
+        { t: 12, d: 3, txt: "myG EPIC", sub: "The Future of Experience" },
+        { t: 15, d: 3, txt: "FROM FUTURE...", sub: "Standardizing Retail" },
+        { t: 18, d: 3, txt: "TO THE EPIC", sub: "Experience Zones" },
+        { t: 21, d: 3, txt: "HIGH-TECH", sub: "World-Class Tech Hub" },
+        { t: 24, d: 3, txt: "NEXT GEN", sub: "Redefining Journey" },
+        { t: 27, d: 3, txt: "myG EPIC", sub: "Extraordinary" }
+      ];
+
+      const current = texts[segmentIndex];
+      if (current && elapsed < 30) {
+        ctx.textAlign = 'center';
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = NEON_ORG;
+        
+        // Vertical position - moved upper (25% of height instead of 50%)
+        const baseY = H * 0.35;
+        
+        // Fast flicker/lightning transition
+        const jitterX = (Math.random() - 0.5) * 5 * (segmentTime < 0.2 ? 15 : 0);
+        
+        // Scale text for mobile
+        const mainSize = Math.min(60, W * 0.1);
+        const subSize = Math.min(24, W * 0.05);
+
+        // Main Text
+        ctx.fillStyle = NEON_ORG;
+        ctx.font = `900 ${mainSize}px "Exo 2", sans-serif`;
+        
+        if (current.logo && logoTransLoaded.current) {
+          const lSize = Math.min(220, W * 0.4);
+          ctx.drawImage(logoTransImg.current, W/2 - lSize/2 + jitterX, baseY - lSize/2 - 40, lSize, lSize);
+        } else {
+          ctx.fillText(current.txt, W/2 + jitterX, baseY);
+        }
+
+        // Subtext
+        ctx.fillStyle = '#fff';
+        ctx.font = `${subSize}px "Orbitron", sans-serif`;
+        ctx.fillText(current.sub, W/2 - jitterX, baseY + mainSize * 0.8 + 10);
+      }
+
+      ctx.restore();
+    }
+
     // ── DRAW: Character (unchanged) ───────────────────────────────────────
     function drawCharacter() {
-      if (!spriteLoaded.current) return;
+      const isIdle = (state === 'idle');
+      const sheet = isIdle ? waveSheet.current : spriteSheet.current;
+      const loaded = isIdle ? waveLoaded.current : spriteLoaded.current;
+      
+      if (!loaded) return;
+
+      // Dynamic Frame Size detection
+      const fw = isIdle ? 1024 : 768;
+      const fh = isIdle ? 1024 : 448;
+
+      const cols = Math.floor(sheet.width / fw) || 1;
+      const rows = Math.floor(sheet.height / fh) || 1;
+      // For the running animation, we know it has 21 frames. 
+      // For others (like wave), we use the full grid.
+      const sheetTotalFrames = isIdle ? (cols * rows) : 21;
+      
       let frameIndex = 0;
-      if (state === 'running') {
+      if (isIdle) {
+        frameIndex = Math.floor(frameCount * 0.18) % sheetTotalFrames;
+      } else if (state === 'running') {
         if (onGround) {
-          frameIndex = Math.floor(frameCount * 0.22) % totalFrames;
+          frameIndex = Math.floor(frameCount * 0.22) % sheetTotalFrames;
         } else {
-          frameIndex = 5;
+          // Frame 5 is usually the 'jump' frame in the 4-column layout
+          frameIndex = Math.min(5, sheetTotalFrames - 1);
         }
       }
-      const col = frameIndex % horizontalFrames;
-      const row = Math.floor(frameIndex / horizontalFrames);
-      const aspect = frameW / frameH;
+      
+      const col = frameIndex % cols;
+      const row = Math.floor(frameIndex / cols);
+      const aspect = fw / fh;
       const drawW = CHAR_SIZE * aspect;
       const drawH = CHAR_SIZE;
 
       ctx.save();
       ctx.translate(CHAR_X, charY + 15);
-      if (!onGround) ctx.rotate(velY * 0.025);
+      if (state === 'running' && !onGround) ctx.rotate(velY * 0.025);
       ctx.drawImage(
-        spriteSheet.current,
-        col * frameW, row * frameH, frameW, frameH,
+        sheet,
+        col * fw, row * fh, fw, fh,
         -drawW / 2, -drawH / 2, drawW, drawH
       );
       ctx.restore();
@@ -503,31 +747,55 @@ export default function Game() {
         if (c.collected) return;
         ctx.save();
         ctx.translate(c.x, c.y);
-        const spin = Math.sin(frameCount * 0.08);
+        const isSpecial = !!c.special;
+        const spin = Math.sin(frameCount * (isSpecial ? 0.25 : 0.16));
         const w = Math.abs(spin);
-        if (c.special) {
-          ctx.scale(w, 1);
-          const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 30);
-          glow.addColorStop(0, 'rgba(255,255,255,0.8)');
-          glow.addColorStop(0.5, 'rgba(233,30,99,0.4)');
-          glow.addColorStop(1, 'rgba(233,30,99,0)');
-          ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, 30, 0, Math.PI * 2); ctx.fill();
-          drawStar(0, 0, 5, 18, 9, '#FF4081');
-          drawStar(0, 0, 5, 12, 6, '#F8BBD0');
-          drawStar(0, 0, 5, 6, 3, '#FFFFFF');
-        } else {
-          if (w < 0.8) {
-            ctx.fillStyle = '#B8860B';
-            ctx.beginPath(); ctx.ellipse(spin * 2, 0, 10 * w, 10, 0, 0, Math.PI * 2); ctx.fill();
+        const rad = isSpecial ? 20 : 14;
+        const lSize = isSpecial ? 24 : 16;
+
+        // myG branded coin
+        const glowRad = isSpecial ? 35 : 20;
+        const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, glowRad);
+        glow.addColorStop(0, isSpecial ? 'rgba(255,107,0,0.8)' : 'rgba(255,107,0,0.6)');
+        glow.addColorStop(1, 'rgba(255,107,0,0)');
+        ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, glowRad, 0, Math.PI * 2); ctx.fill();
+
+        // Electrifying lightning sparks for special coins
+        if (isSpecial && Math.random() > 0.6) {
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 1;
+          for (let i = 0; i < 2; i++) {
+            const ang = Math.random() * Math.PI * 2;
+            const dist = rad + 2 + Math.random() * 12;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
+            ctx.lineTo(Math.cos(ang) * dist, Math.sin(ang) * dist);
+            ctx.stroke();
           }
-          const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 15);
-          glow.addColorStop(0, '#FFF176'); glow.addColorStop(1, 'rgba(253,216,53,0)');
-          ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.fill();
-          ctx.scale(w, 1);
-          ctx.fillStyle = '#FDD835'; ctx.strokeStyle = '#FBC02D'; ctx.lineWidth = 2;
-          ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-          ctx.fillStyle = '#FFEE58'; ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.fill();
         }
+
+        ctx.scale(w, 1);
+        ctx.fillStyle = NEON_ORG;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = isSpecial ? 4 : 3;
+        ctx.beginPath(); ctx.arc(0, 0, rad, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+        // Inner rim
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(0, 0, rad * 0.8, 0, Math.PI * 2); ctx.stroke();
+
+        // myG Logo on Coin
+        if (logoLoaded.current) {
+          ctx.drawImage(logoImg.current, -lSize / 2, -lSize / 2, lSize, lSize);
+        } else {
+          ctx.fillStyle = '#fff';
+          ctx.font = `900 ${isSpecial ? 16 : 12}px "Exo 2"`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('G', 0, 0);
+        }
+        
         ctx.restore();
       });
     }
@@ -605,7 +873,7 @@ export default function Game() {
           alpha: 1,
           rot: Math.random() * Math.PI * 2,
           vrot: (Math.random() - 0.5) * 0.4,
-          color: color || (['#ff6b00', '#9b30ff', '#fff', '#FFD700', '#ff3399'][Math.floor(Math.random() * 5)]),
+          color: color || (isSpecial ? NEON_ORG : ['#ff6b00', '#fff', '#9b30ff'][Math.floor(Math.random() * 3)]),
           drag: isSpecial ? 0.96 : 0.98,
         });
       }
@@ -613,32 +881,61 @@ export default function Game() {
 
     // ── DRAW: HUD (cyberpunk reskin) ──────────────────────────────────────
     function drawHUD() {
-      // Score box — top left, dark with orange border
+      if (state === 'idle') return;
+      
+      // Score — top left
       ctx.save();
-      const scoreW = 120, scoreH = 50;
-      ctx.translate(20, 20);
-      ctx.fillStyle = SCORE_BG;
+      const scoreW = 90, scoreH = 45;
+      ctx.translate(15, 15);
+      ctx.fillStyle = 'rgba(3,1,10,0.85)';
       ctx.strokeStyle = NEON_ORG;
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.roundRect(0, 0, scoreW, scoreH, 8); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = NEON_ORG; ctx.font = '10px "Luckiest Guy"'; ctx.textAlign = 'center';
-      ctx.fillText('SCORE', scoreW / 2, 17);
-      ctx.fillStyle = '#fff'; ctx.font = '22px "Luckiest Guy"';
-      ctx.fillText(Math.floor(score), scoreW / 2, 40);
+      ctx.fillStyle = NEON_ORG; ctx.font = '9px "Luckiest Guy"'; ctx.textAlign = 'center';
+      ctx.fillText('SCORE', scoreW / 2, 14);
+      ctx.fillStyle = '#fff'; ctx.font = '20px "Luckiest Guy"';
+      ctx.fillText(Math.floor(score), scoreW / 2, 36);
       ctx.restore();
 
       // Coin display — top right
       ctx.save();
-      const coinTextW = ctx.measureText(coinsCollected).width;
-      ctx.translate(canvas.width - 60 - coinTextW, 45);
-      const spin = Math.sin(frameCount * 0.1);
+      const coinY = 38;
+      ctx.font = '24px "Luckiest Guy"';
+      const coinText = coinsCollected.toString();
+      const textW = ctx.measureText(coinText).width;
+      
+      // Spinning myG coin icon
+      const coinX = W - 25 - textW - 25;
       ctx.save();
-      ctx.scale(Math.abs(spin), 1);
-      ctx.fillStyle = '#FDD835'; ctx.strokeStyle = '#FBC02D'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.translate(coinX, coinY);
+      const spin = Math.sin(frameCount * 0.1);
+      ctx.fillStyle = NEON_ORG; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+      ctx.shadowBlur = 10; ctx.shadowColor = NEON_ORG;
+      ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+      // Inner rim
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.stroke();
+      
+      if (logoLoaded.current) {
+        const lSize = 16;
+        ctx.drawImage(logoImg.current, -lSize / 2, -lSize / 2, lSize, lSize);
+      } else {
+        ctx.fillStyle = '#fff';
+        ctx.font = '900 12px "Exo 2"';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('G', 0, 0);
+      }
       ctx.restore();
-      ctx.fillStyle = '#fff'; ctx.font = '28px "Luckiest Guy"'; ctx.textAlign = 'left';
-      ctx.fillText(coinsCollected, 18, 10);
+
+      // Text
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.shadowBlur = 5; ctx.shadowColor = '#000';
+      ctx.fillText(coinText, W - 15, coinY + 2);
       ctx.restore();
     }
 
@@ -750,13 +1047,17 @@ export default function Game() {
       coins = []; coinsCollected = 0;
       lastMilestone = 0; milestoneTimer = 0;
       particles = []; floaters = []; jumpTrail = []; state = 'running';
+      introTimer = 0;
       bgAudio.current.currentTime = 0;
       bgAudio.current.play().catch(() => {});
     }
 
     function update(dtScale) {
+      frameCount += dtScale; // Always increment for animations (like wave)
+      
       if (state !== 'running') return;
-      frameCount += dtScale; score += 0.1 * dtScale;
+      score += 0.1 * dtScale;
+      introTimer += dtScale;
 
       // Gradually increase speed until it is 40% more than the original 6.0 (Max: 8.4)
       if (speed < 8.4) {
@@ -845,7 +1146,8 @@ export default function Game() {
             coins.push({ 
               x: px - pw/2 + (i + 0.5) * (pw / coinCount), 
               y: py - 40, 
-              collected: false 
+              collected: false,
+              special: Math.random() > 0.85
             });
           }
         }
@@ -866,19 +1168,21 @@ export default function Game() {
       // Spawn Ground Segments (Gaps)
       nextGroundIn -= dtScale;
       if (nextGroundIn <= 0) {
+        const isIntro = (introTimer / 60) <= 30;
         const gw = 600 + Math.random() * 800;
-        const gap = 120 + Math.random() * 220;
+        const gap = isIntro ? 0 : (120 + Math.random() * 220);
         const gx = W + gap;
         groundSegments.push({ x: gx, w: gw });
         
         // Spawn coins on ground
-        if (Math.random() > 0.2) { // High frequency
-          const coinCount = 4 + Math.floor(Math.random() * 6);
+        if (Math.random() > 0.6) { // Lower frequency
+          const coinCount = 3 + Math.floor(Math.random() * 3);
           for (let i = 0; i < coinCount; i++) {
             coins.push({ 
               x: gx + (i + 0.5) * (gw / coinCount), 
               y: GROUND_Y - 40, 
-              collected: false 
+              collected: false,
+              special: Math.random() > 0.85
             });
           }
         }
@@ -936,7 +1240,7 @@ export default function Game() {
               bonusAudio.current.play().catch(() => {});
             } else {
               coinsCollected++; score += 10;
-              spawnParticles(c.x, c.y, '#FFEE58');
+              spawnParticles(c.x, c.y, NEON_ORG);
               coinAudio.current.currentTime = 0;
               coinAudio.current.play().catch(() => {});
             }
@@ -1001,7 +1305,7 @@ export default function Game() {
       // ── Night sky ──
       drawSky();
       drawStars();
-      drawMoon();
+      drawCelestial();
       drawNeonDust();
 
       // ── Parallax building layers: farthest → nearest ──
@@ -1009,10 +1313,17 @@ export default function Game() {
       drawBuildings(bldGhost, scrollFar * 0.15, WORLD_W * 3.5, '#07040f', 0.55, false, false);
       // Far city — dark purple, no windows
       drawBuildings(bldFar,   scrollFar * 0.3,  WORLD_W * 3,   '#0d0820', 0.70, false, true);
-      // Mid city — slightly lighter, sparse windows
-      drawBuildings(bldMid,   scrollMid * 0.6,  WORLD_W * 2.5, '#120d26', 0.85, true,  true);
-      // Near city — visible detail, full windows
-      drawBuildings(bldNear,  scrollNear,        WORLD_W * 2,   '#1a0d18', 0.95, true,  true);
+      // Mid city — sparse windows + billboards
+      const isIntro = (introTimer / 60) <= 30;
+      
+      if (!isIntro) {
+        drawBillboards(adsMid, scrollMid * 0.6, WORLD_W * 2.5, 0.5);
+        drawBuildings(bldMid,   scrollMid * 0.6,  WORLD_W * 2.5, '#120d26', 0.85, true,  true);
+        drawBillboards(adsNear, scrollNear, WORLD_W * 2, 0.85);
+        drawBuildings(bldNear,  scrollNear,        WORLD_W * 2,   '#1a0d18', 0.95, true,  true);
+      }
+
+      if (state === 'running' && introTimer / 60 <= 30) drawBrandIntro();
 
       // ── Ground & street ──
       drawStreetLights();
