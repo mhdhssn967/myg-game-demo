@@ -304,6 +304,7 @@ const GameScene = ({ isRunning, jumpTrigger }) => {
     {/* Heavy dark fog for depth */}
     <fog attach="fog" args={['#060610', 20, 130]} />
   </>
-);
+  );
+};
 
 export default GameScene;
