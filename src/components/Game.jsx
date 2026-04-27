@@ -1267,7 +1267,10 @@ export default function Game() {
       if (!stood) onGround = false;
 
       // Death check (Falling off or hitting electricity)
-      if (charY > GROUND_Y + 15 && !onGround && state === 'running') {
+      // We check if the character is NOT over any solid ground segment
+      const overGround = groundSegments.some(g => CHAR_X >= g.x && CHAR_X <= g.x + g.w);
+      
+      if (charY > GROUND_Y + 15 && !overGround && state === 'running') {
         state = 'shocked';
         setGameStatus('shocked');
         shockTimer = 80;
@@ -1353,8 +1356,8 @@ export default function Game() {
       nextGroundIn -= dtScale;
       if (nextGroundIn <= 0) {
         const isIntro = (introTimer / 60) <= 30;
-        const gw = 600 + Math.random() * 800;
-        const gap = isIntro ? 0 : (120 + Math.random() * 220);
+        const gw = isIntro ? 1200 : (600 + Math.random() * 800);
+        const gap = isIntro ? -10 : (120 + Math.random() * 220); // Overlap by 10px in intro to ensure no gaps
         const gx = W + gap;
         groundSegments.push({ x: gx, w: gw });
         
