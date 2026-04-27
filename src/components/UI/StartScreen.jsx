@@ -84,9 +84,14 @@ const StartScreen = ({ onStart }) => {
                   if (window.screen.orientation && window.screen.orientation.lock) {
                     window.screen.orientation.lock('portrait').catch(() => {});
                   }
-                }).catch(() => {});
+                }).catch(() => {
+                  document.body.style.cssText = 'position:fixed;inset:0;overflow:hidden;touch-action:none;';
+                });
+              } else {
+                document.body.style.cssText = 'position:fixed;inset:0;overflow:hidden;touch-action:none;';
               }
             } catch (err) {
+              document.body.style.cssText = 'position:fixed;inset:0;overflow:hidden;touch-action:none;';
               console.warn("Fullscreen request failed:", err);
             }
 

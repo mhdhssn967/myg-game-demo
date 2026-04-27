@@ -74,7 +74,31 @@ export default function Game() {
       const progress = (loadedCount / totalToLoad) * 100;
       setLoadingProgress(progress);
       if (loadedCount >= totalToLoad) {
-        setTimeout(() => setIsLoading(false), 800); 
+        // Section 2.3 - Pre-warm decodes to prevent first-draw stutter on Safari
+        const allImgs = [
+          ...imageAssets.map(a => a.ref.current),
+          ...Object.values(productImages.current),
+          ...billboardImages.current
+        ];
+        Promise.all(allImgs.filter(i => i && i.decode).map(i => i.decode().catch(() => {})))
+          .then(() => {
+            setTimeout(() => setIsLoading(false), 800); 
+          });
+      }
+    };
+
+    // Low-end device detection (Task 10)
+    const isLowEnd = 
+      (typeof navigator !== 'undefined') &&
+      (navigator.hardwareConcurrency <= 4 ||
+      (navigator.deviceMemory && navigator.deviceMemory < 3) ||
+      /iPhone OS [89]_|iPhone OS 1[0-3]_/.test(navigator.userAgent));
+    
+    // Load products in batches (Task 6)
+    const loadBatch = async (items, processItem, batchSize = 6) => {
+      for (let i = 0; i < items.length; i += batchSize) {
+        const batch = items.slice(i, i + batchSize);
+        await Promise.all(batch.map(processItem));
       }
     };
 
@@ -88,27 +112,46 @@ export default function Game() {
       asset.ref.current.onerror = incrementProgress;
     });
 
-    // Load products
-    productList.forEach(p => {
-      const img = new Image();
-      img.src = `/images/products/${p}.png`;
-      img.onload = () => {
-        productImages.current[p] = img;
-        productsLoaded.current++;
-        incrementProgress();
-      };
-      img.onerror = incrementProgress;
-    });
+    loadBatch(productList, (p) => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          productImages.current[p] = img;
+          productsLoaded.current++;
+          incrementProgress();
+          resolve();
+        };
+        img.onerror = () => {
+          if (img.src.endsWith('.webp')) {
+            img.src = `/images/products/${p}.png`;
+          } else {
+            incrementProgress();
+            resolve();
+          }
+        };
+        img.src = `/images/products/${p}.webp`;
+      });
+    }, 6);
 
-    // Load billboards
-    for (let i = 1; i <= 14; i++) {
-      const img = new Image();
-      const ext = (i === 13 || i === 14) ? 'jpg' : 'png';
-      img.src = `/images/billboards/story${i}.${ext}`;
-      billboardImages.current.push(img);
-      img.onload = incrementProgress;
-      img.onerror = incrementProgress;
-    }
+    // Load billboards in batches
+    const bbIndices = Array.from({length: 14}, (_, i) => i + 1);
+    loadBatch(bbIndices, (i) => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        const fallbackExt = (i === 13 || i === 14) ? 'jpg' : 'png';
+        billboardImages.current.push(img);
+        img.onload = () => { incrementProgress(); resolve(); };
+        img.onerror = () => {
+          if (img.src.endsWith('.webp')) {
+            img.src = `/images/billboards/story${i}.${fallbackExt}`;
+          } else {
+            incrementProgress();
+            resolve();
+          }
+        };
+        img.src = `/images/billboards/story${i}.webp`;
+      });
+    }, 6);
 
     // Load audio
     audioAssetsList.forEach(asset => {
@@ -121,14 +164,23 @@ export default function Game() {
     });
 
     const unlockAudio = () => {
-      bgAudio.current.play().then(() => {
-        if (state === 'idle') bgAudio.current.pause();
-      }).catch(() => {});
-      window.removeEventListener('click', unlockAudio);
-      window.removeEventListener('touchstart', unlockAudio);
+      audioAssetsList.forEach(asset => {
+        const audio = asset.ref.current;
+        audio.play().then(() => {
+          if (state === 'idle') {
+            audio.pause();
+            audio.currentTime = 0;
+          }
+        }).catch(() => {});
+      });
     };
-    window.addEventListener('click', unlockAudio);
-    window.addEventListener('touchstart', unlockAudio);
+    window.addEventListener('pointerdown', unlockAudio, { once: true });
+
+    const vibrate = (pattern) => {
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try { navigator.vibrate(pattern); } catch (e) {}
+      }
+    };
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -139,7 +191,8 @@ export default function Game() {
     let charY = GROUND_Y - CHAR_SIZE / 2;
 
     const updateSize = () => {
-      const dpr = window.devicePixelRatio || 1;
+      // Cap DPR at 2 to prevent memory crashes on iPhones (Section 5.2)
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = window.innerWidth * dpr;
       canvas.height = window.innerHeight * dpr;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -451,8 +504,8 @@ export default function Game() {
               ctx.globalAlpha = opacity * 0.9;
               const logoSize = Math.min(b.w * 0.8, 120);
               // Neon glow for building logo
-              ctx.shadowBlur = 15;
-              ctx.shadowColor = NEON_ORG;
+              
+              
               ctx.drawImage(img, bx + b.w/2 - logoSize/2, by + b.h/4, logoSize, logoSize);
               ctx.restore();
             }
@@ -540,8 +593,8 @@ export default function Game() {
           for (let j = 0; j < count; j++) {
             const lx = gx + (j + 0.5) * (gw / count);
             ctx.globalAlpha = 0.9;
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = NEON_ORG;
+            
+            
             ctx.drawImage(logoTransImg.current, lx - logoSize / 2, GROUND_Y + 25, logoSize, logoSize);
           }
           ctx.restore();
@@ -586,8 +639,8 @@ export default function Game() {
           ctx.lineTo(sx, sy);
         }
         
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = ctx.strokeStyle;
+        
+        
         ctx.stroke();
       }
       ctx.restore();
@@ -617,8 +670,8 @@ export default function Game() {
         if (Math.random() > 0.985 && ad.flicker > 0.7) ctx.globalAlpha *= 0.2;
 
         // Glow
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = ad.glowColor;
+        
+        
 
         // Frame
         ctx.fillStyle = '#0a0a1a';
@@ -634,7 +687,7 @@ export default function Game() {
         ctx.drawImage(img, x - w/2 + 5, drawY - h/2 + 5, w - 10, h - 10);
 
         // Support poles (futuristic dual poles)
-        ctx.shadowBlur = 0;
+        
         ctx.strokeStyle = '#1a1a2e';
         ctx.lineWidth = 4;
         ctx.beginPath();
@@ -671,8 +724,8 @@ export default function Game() {
 
         ctx.strokeStyle = NEON_ORG;
         ctx.lineWidth = 2 + Math.random() * 3;
-        ctx.shadowBlur = 25;
-        ctx.shadowColor = NEON_ORG;
+        
+        
         ctx.beginPath();
         let lx = W/2 + (Math.random() - 0.5) * W * 0.8, ly = 0;
         ctx.moveTo(lx, ly);
@@ -701,8 +754,8 @@ export default function Game() {
       const current = texts[segmentIndex];
       if (current && elapsed < 30) {
         ctx.textAlign = 'center';
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = NEON_ORG;
+        
+        
         
         // Vertical position - moved upper (25% of height instead of 50%)
         const baseY = H * 0.35;
@@ -753,11 +806,15 @@ export default function Game() {
       const sheetTotalFrames = isIdle ? (cols * rows) : 21;
       
       let frameIndex = 0;
+      const RUN_FPS = 12;
+      const IDLE_FPS = 10;
+      const seconds = (frameCount * 16.67) / 1000;
+      
       if (isIdle) {
-        frameIndex = Math.floor(frameCount * 0.18) % sheetTotalFrames;
+        frameIndex = Math.floor(seconds * IDLE_FPS) % sheetTotalFrames;
       } else if (state === 'running') {
         if (onGround) {
-          frameIndex = Math.floor(frameCount * 0.22) % sheetTotalFrames;
+          frameIndex = Math.floor(seconds * RUN_FPS) % sheetTotalFrames;
         } else {
           // Frame 5 is usually the 'jump' frame in the 4-column layout
           frameIndex = Math.min(5, sheetTotalFrames - 1);
@@ -803,11 +860,6 @@ export default function Game() {
       ctx.translate(CHAR_X + jitterX, charY + 15 + jitterY);
       if (state === 'running' && !onGround) ctx.rotate(velY * 0.025);
       
-      // Strobe effect for shock
-      if (state === 'shocked' && Math.floor(frameCount * 0.5) % 2 === 0) {
-        ctx.filter = 'invert(1) brightness(1.5)';
-      }
-
       // If shocked, we use a single frame of the running sheet
       const currentSheet = sheet;
       const currentCols = cols;
@@ -818,7 +870,16 @@ export default function Game() {
         (currentFrame % currentCols) * fw, Math.floor(currentFrame / currentCols) * fh, fw, fh,
         -drawW / 2, -drawH / 2, drawW, drawH
       );
-      ctx.filter = 'none';
+      
+      // Strobe effect for shock (Using canvas composite instead of expensive CSS invert)
+      if (state === 'shocked' && Math.floor(frameCount * 0.5) % 2 === 0) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'difference';
+        ctx.fillStyle = 'white';
+        ctx.fillRect(-drawW / 2, -drawH / 2, drawW, drawH);
+        ctx.restore();
+      }
+
       ctx.restore();
     }
 
@@ -835,9 +896,14 @@ export default function Game() {
         ctx.fill();
         ctx.stroke();
 
-        // Neon Glow
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = NEON_ORG;
+        // Neon Glow (Fake-glow Layered strokes)
+        ctx.strokeStyle = 'rgba(255,107,0,0.2)';
+        ctx.lineWidth = 8;
+        ctx.strokeRect(p.x - p.w / 2, p.y, p.w, 15);
+        ctx.strokeStyle = 'rgba(255,107,0,0.5)';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(p.x - p.w / 2, p.y, p.w, 15);
+        
         ctx.fillStyle = NEON_ORG;
         ctx.fillRect(p.x - p.w / 2, p.y, p.w, 2);
         ctx.restore();
@@ -851,8 +917,8 @@ export default function Game() {
         if (img) {
           ctx.save();
           // Glow effect for products
-          ctx.shadowBlur = 15;
-          ctx.shadowColor = NEON_ORG;
+          
+          
           
           // Maintain original aspect ratio
           const aspect = img.width / img.height;
@@ -962,8 +1028,8 @@ export default function Game() {
       if (jumpTrail.length < 2) return;
       ctx.save();
       // Draw the neon glow first
-      ctx.shadowBlur = 15;
-      ctx.shadowColor = NEON_ORG;
+      
+      
       ctx.lineWidth = 10;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -981,7 +1047,7 @@ export default function Game() {
       }
 
       // Draw a brighter core
-      ctx.shadowBlur = 0;
+      
       for (let i = 1; i < jumpTrail.length; i++) {
         const p1 = jumpTrail[i - 1];
         const p2 = jumpTrail[i];
@@ -1056,7 +1122,7 @@ export default function Game() {
       ctx.translate(coinX, coinY);
       const spin = Math.sin(frameCount * 0.1);
       ctx.fillStyle = NEON_ORG; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
-      ctx.shadowBlur = 10; ctx.shadowColor = NEON_ORG;
+       
       ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 
       // Inner rim
@@ -1080,7 +1146,7 @@ export default function Game() {
       ctx.fillStyle = '#fff';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      ctx.shadowBlur = 5; ctx.shadowColor = '#000';
+       
       ctx.fillText(coinText, W - 15, coinY + 2);
       ctx.restore();
     }
@@ -1207,8 +1273,8 @@ export default function Game() {
       if (state === 'shocked') {
         shockTimer -= dtScale;
         // Continuous pulsed vibration
-        if (navigator.vibrate && Math.floor(frameCount) % 10 === 0) {
-          navigator.vibrate(60);
+        if (Math.floor(frameCount) % 10 === 0) {
+          vibrate(60);
         }
         if (shockTimer <= 0) {
           state = 'dead';
@@ -1278,7 +1344,7 @@ export default function Game() {
         shockAudio.current.currentTime = 0;
         shockAudio.current.play().catch(() => {});
         // Haptic feedback
-        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+        vibrate([200, 100, 200]);
         // Stop vertical momentum to stay in the gap
         velY = 0;
       }
@@ -1553,7 +1619,8 @@ export default function Game() {
       // Mid city — sparse windows + billboards
       const isIntro = (introTimer / 60) <= 30;
       
-      if (!isIntro) {
+      // Render mid layers only if not on a low-end device (Task 10)
+      if (!isIntro && !isLowEnd) {
         drawBillboards(adsMid, scrollMid * 0.6, WORLD_W * 2.5, 0.5);
         drawBuildings(bldMid,   scrollMid * 0.6,  WORLD_W * 2.5, '#120d26', 0.85, true,  true);
         drawBillboards(adsNear, scrollNear, WORLD_W * 2, 0.85);
@@ -1643,8 +1710,8 @@ export default function Game() {
         }
         
         // Glow
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = '#ff0000';
+        
+        
         if (!magnetLoaded.current) ctx.stroke();
 
         ctx.restore();
@@ -1654,12 +1721,15 @@ export default function Game() {
     let lastTime = 0;
     function loop(now) {
       if (isLoadingRef.current) {
+        lastTime = now;
         animId = requestAnimationFrame(loop);
         return;
       }
-      const dt = lastTime ? (now - lastTime) / 16.67 : 1;
+      const rawDelta = lastTime ? (now - lastTime) : 16.67;
       lastTime = now;
-      update(Math.min(2, dt));
+      // Cap delta at 50ms to prevent spiral of death
+      const dt = Math.min(rawDelta, 50) / 16.67;
+      update(dt);
       draw();
       animId = requestAnimationFrame(loop);
     }
