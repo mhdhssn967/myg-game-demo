@@ -1,11 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Loader from './Loader';
+import StartScreen from './UI/StartScreen';
 import runSprite from '../assets/run.png';
 import waveSprite from '../assets/wave.png';
 
 export default function Game() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [gameStatus, setGameStatus] = useState('idle');
+  const startTriggerRef = useRef(null);
   const canvasRef = useRef(null);
   const spriteSheet = useRef(new Image());
   const spriteLoaded = useRef(false);
@@ -1095,10 +1098,12 @@ export default function Game() {
       coins = []; coinsCollected = 0;
       lastMilestone = 0; milestoneTimer = 0;
       particles = []; floaters = []; jumpTrail = []; state = 'running';
+      setGameStatus('running');
       introTimer = 0;
       bgAudio.current.currentTime = 0;
       bgAudio.current.play().catch(() => {});
     }
+    startTriggerRef.current = resetGame;
 
     function update(dtScale) {
       frameCount += dtScale; // Always increment for animations (like wave)
@@ -1154,6 +1159,7 @@ export default function Game() {
       // Death check (Falling off)
       if (charY > H + 100) {
         state = 'dead';
+        setGameStatus('dead');
         bgAudio.current.pause();
         if (score > bestScore) bestScore = score;
       }
@@ -1388,10 +1394,7 @@ export default function Game() {
       drawHUD();
 
       // ── Overlays ──
-      if (state === 'idle') drawOverlay([
-        { text: 'MYG RUNNER', size: 42, color: NEON_ORG, y: -24 },
-        { text: 'Tap to start', size: 20, color: '#c084fc', y: 28 },
-      ]);
+      // Canvas-based idle overlay removed in favor of React-based StartScreen
       if (state === 'dead') drawGameOver();
 
       if (milestoneTimer > 0) {
@@ -1432,6 +1435,9 @@ export default function Game() {
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: '#03010a', overflow: 'hidden' }}>
       {isLoading && <Loader progress={loadingProgress} />}
+      {!isLoading && gameStatus === 'idle' && (
+        <StartScreen onStart={() => startTriggerRef.current?.()} />
+      )}
       <canvas ref={canvasRef} style={{ display: isLoading ? 'none' : 'block', width: '100%', height: '100%' }} />
     </div>
   );
