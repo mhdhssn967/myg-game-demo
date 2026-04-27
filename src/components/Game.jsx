@@ -26,6 +26,8 @@ export default function Game() {
   const logoTransLoaded = useRef(false);
   const waveLoaded = useRef(false);
   const magnetLoaded = useRef(false);
+  const shipImg = useRef(new Image());
+  const shipLoaded = useRef(false);
 
   const products = ['iphone', 'fridge', 'washing_machine', 'ac', 'laptop', 'microwave', 'tv', 'headphone', 'viccum_cleaner', 'watch', 'blender'];
   const productImages = useRef({});
@@ -40,6 +42,8 @@ export default function Game() {
   const lightningAudio = useRef(new Audio('/sounds/lightning.mp3'));
   const shockAudio = useRef(new Audio('/sounds/shock.mp3'));
   const powerAudio = useRef(new Audio('/sounds/power.mp3'));
+  const missileAudio = useRef(new Audio('/sounds/missile.mp3'));
+  const explosionAudio = useRef(new Audio('/sounds/explosion.mp3'));
 
   useEffect(() => {
     const productList = ['iphone', 'fridge', 'washing_machine', 'ac', 'laptop', 'microwave', 'tv', 'headphone', 'viccum_cleaner', 'watch', 'blender'];
@@ -53,6 +57,7 @@ export default function Game() {
       { ref: logoImg, src: '/images/Glogo.png', flag: logoLoaded },
       { ref: logoTransImg, src: '/images/mygtrans.png', flag: logoTransLoaded },
       { ref: magnetImg, src: '/images/magnet.svg', flag: magnetLoaded },
+      { ref: shipImg, src: '/images/assets/spaceship.svg', flag: shipLoaded },
     ];
 
     const audioAssetsList = [
@@ -64,6 +69,8 @@ export default function Game() {
       { ref: lightningAudio, src: '/sounds/lightning.mp3', vol: 0.6 },
       { ref: shockAudio, src: '/sounds/shock.mp3', vol: 0.9 },
       { ref: powerAudio, src: '/sounds/power.mp3', vol: 0.9 },
+      { ref: missileAudio, src: '/sounds/missile.mp3', vol: 0.7 },
+      { ref: explosionAudio, src: '/sounds/explosion.mp3', vol: 0.9 },
     ];
 
     const totalToLoad = imageAssets.length + productList.length + 14 + audioAssetsList.length;
@@ -227,7 +234,7 @@ export default function Game() {
     const SCORE_BG   = 'rgba(10, 5, 20, 0.92)';
 
     // ── Layout CONSTANTS ──────────────────────────────────────────────────
-    const CHAR_X = W * 0.25;
+    const CHAR_X = W * 0.10;
     const GRAVITY = 0.4;
     const JUMP_VEL = -11;
     const MAX_JUMPS = 2;
@@ -255,6 +262,11 @@ export default function Game() {
     let shockTimer = 0; // for the shocked animation
     let magnetTimer = 0; // magnet powerup duration
     let magnets = [];
+    
+    // ── Boss/Hazard: Spaceship ──
+    let ship = { active: false, x: 0, y: 0, state: 'idle', timer: 0, shootTimer: 0, shotsLeft: 0, cooldown: 0 };
+    let rocket = { active: false, x: 0, y: 0, startX: 0, startY: 0, targetX: 0, targetY: 0, t: 0, rot: 0 };
+    let lastShipMilestone = 0;
 
     // ── Task 3: Object Pooling ────────────────────────────────────────────
     const COIN_POOL_SIZE = 80;
@@ -295,6 +307,28 @@ export default function Game() {
         p.rot = Math.random() * Math.PI * 2;
         p.vrot = (Math.random() - 0.5) * 0.2;
         p.drag = 0.95 + Math.random() * 0.04;
+      }
+    }
+
+    function spawnExplosion(x, y) {
+      // Fire
+      for (let i = 0; i < 20; i++) {
+        spawnParticle(x, y, ['#ff3300', '#ff6b00', '#fff'][Math.floor(Math.random() * 3)], 8 + Math.random() * 12, true);
+      }
+      // Smoke
+      for (let i = 0; i < 15; i++) {
+        const p = particlePool.find(part => !part.active);
+        if (p) {
+          p.active = true; p.x = x; p.y = y;
+          p.vx = (Math.random() - 0.5) * 4;
+          p.vy = (Math.random() - 0.5) * 4 - 2;
+          p.alpha = 0.7;
+          p.color = '#333';
+          p.s = 15 + Math.random() * 20;
+          p.rot = Math.random() * Math.PI * 2;
+          p.vrot = (Math.random() - 0.5) * 0.05;
+          p.drag = 0.98;
+        }
       }
     }
 
@@ -894,12 +928,19 @@ export default function Game() {
         -drawW / 2, -drawH / 2, drawW, drawH
       );
       
-      // Strobe effect for shock (Using canvas composite instead of expensive CSS invert)
+      // Strobe effect for shock (Using canvas composite to limit flash to character pixels)
       if (state === 'shocked' && Math.floor(frameCount * 0.5) % 2 === 0) {
         ctx.save();
         ctx.globalCompositeOperation = 'difference';
         ctx.fillStyle = 'white';
         ctx.fillRect(-drawW / 2, -drawH / 2, drawW, drawH);
+        // Mask the inversion back to the character's shape
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.drawImage(
+          currentSheet,
+          (currentFrame % currentCols) * fw, Math.floor(currentFrame / currentCols) * fh, fw, fh,
+          -drawW / 2, -drawH / 2, drawW, drawH
+        );
         ctx.restore();
       }
 
@@ -1085,6 +1126,105 @@ export default function Game() {
       });
     }
 
+    function drawSpaceship() {
+      if (!ship.active) return;
+      ctx.save();
+      ctx.translate(ship.x, ship.y);
+      
+      // Draw the SVG spaceship if loaded, fallback to saucer if not
+      if (shipLoaded.current) {
+        const sW = 120;
+        const sH = sW * (shipImg.current.height / shipImg.current.width) || 60;
+        ctx.drawImage(shipImg.current, -sW / 2, -sH / 2, sW, sH);
+        
+        // Add a pulsing neon glow behind the ship
+        const g = ctx.createRadialGradient(0, 0, 10, 0, 0, 80);
+        g.addColorStop(0, 'rgba(0, 255, 255, 0.2)');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(0, 0, 80, 0, Math.PI*2); ctx.fill();
+      } else {
+        // Comical Cyberpunk Saucer (Fallback)
+        const w = 120, h = 40;
+        ctx.fillStyle = '#1a1a2e';
+        ctx.strokeStyle = NEON_PRP;
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.ellipse(0, 0, w/2, h/2, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      }
+
+      // Aiming laser line if aiming
+      if (ship.state === 'aiming' && ship.shootTimer < 60) {
+        ctx.strokeStyle = 'rgba(255, 0, 0, ' + (0.4 + Math.sin(frameCount*0.6)*0.4) + ')';
+        ctx.setLineDash([5, 5]);
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(CHAR_X - ship.x, charY - ship.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      ctx.restore();
+    }
+
+    function drawRocket() {
+      if (!rocket.active) return;
+      ctx.save();
+      ctx.translate(rocket.x, rocket.y);
+      
+      // Better Missile Visuals: Comical wobble
+      const wobble = Math.sin(frameCount * 0.3) * 0.15;
+      ctx.rotate(rocket.rot + wobble);
+
+      const rw = 45, rh = 18;
+      
+      // Improved Neon exhaust tail
+      const tailGlow = ctx.createLinearGradient(0, 0, -rw * 1.5, 0);
+      tailGlow.addColorStop(0, '#fff');
+      tailGlow.addColorStop(0.2, NEON_ORG);
+      tailGlow.addColorStop(1, 'rgba(255, 0, 255, 0)');
+      
+      ctx.fillStyle = tailGlow;
+      ctx.beginPath();
+      ctx.moveTo(-rw/2, -rh/2);
+      ctx.lineTo(-rw * 1.8 - Math.random()*15, 0);
+      ctx.lineTo(-rw/2, rh/2);
+      ctx.fill();
+
+      // Rocket Body with gradient
+      const bodyGrd = ctx.createLinearGradient(0, -rh/2, 0, rh/2);
+      bodyGrd.addColorStop(0, '#ff4d4d');
+      bodyGrd.addColorStop(1, '#990000');
+      ctx.fillStyle = bodyGrd;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      
+      // Pointy nose
+      ctx.beginPath();
+      ctx.moveTo(rw/2 + 10, 0); 
+      ctx.lineTo(rw/2, -rh/2);
+      ctx.lineTo(-rw/2, -rh/2);
+      ctx.lineTo(-rw/2, rh/2);
+      ctx.lineTo(rw/2, rh/2);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+
+      // Neon stripes
+      ctx.strokeStyle = '#0ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-5, -rh/2); ctx.lineTo(-5, rh/2); ctx.stroke();
+
+      // Fins
+      ctx.fillStyle = '#1a1a2e';
+      ctx.beginPath();
+      ctx.moveTo(-rw/2, rh/2); ctx.lineTo(-rw/2-12, rh/2+10); ctx.lineTo(-rw/4, rh/2); ctx.fill();
+      ctx.stroke();
+      ctx.moveTo(-rw/2, -rh/2); ctx.lineTo(-rw/2-12, -rh/2-10); ctx.lineTo(-rw/4, -rh/2); ctx.fill();
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
     // ── DRAW: HUD (cyberpunk reskin) ──────────────────────────────────────
     function drawHUD() {
       if (state === 'idle') return;
@@ -1256,6 +1396,9 @@ export default function Game() {
       particles = []; floaters = []; jumpTrail = []; state = 'running';
       setGameStatus('running');
       introTimer = 0; shockTimer = 0;
+      ship.active = false; ship.cooldown = 0; ship.state = 'idle';
+      lastShipMilestone = 0;
+      rocket.active = false;
       bgAudio.current.currentTime = 0;
       bgAudio.current.play().catch(() => {});
     }
@@ -1263,6 +1406,23 @@ export default function Game() {
 
     function update(dtScale) {
       frameCount += dtScale; // Always increment for animations (like wave)
+
+      // ── Task 3/4: Update Visuals (Moved to top so they play even after death) ──
+      particlePool.forEach(p => {
+        if (!p.active) return;
+        p.vx *= (p.drag || 1);
+        p.x += p.vx * dtScale; p.y += p.vy * dtScale;
+        p.vy += 0.25 * dtScale;
+        p.alpha -= 0.02 * dtScale; p.rot += p.vrot * dtScale;
+        if (p.alpha <= 0) p.active = false;
+      });
+      floaters.forEach(f => { f.y -= 1.5 * dtScale; f.alpha -= 0.02 * dtScale; });
+      floaters = floaters.filter(f => f.alpha > 0);
+      jumpTrail.forEach(t => {
+        t.x -= (speed * dtScale); // Approximate move
+        t.alpha -= 0.03 * dtScale;
+      });
+      jumpTrail = jumpTrail.filter(t => t.alpha > 0 && t.x > -50);
       
       if (state === 'shocked') {
         shockTimer -= dtScale;
@@ -1510,28 +1670,117 @@ export default function Game() {
       }
       if (milestoneTimer > 0) milestoneTimer -= dtScale;
 
-      // Update Particles (Task 3: Pooling)
-      particlePool.forEach(p => {
-        if (!p.active) return;
-        p.vx *= (p.drag || 1);
-        p.x += p.vx * dtScale; p.y += p.vy * dtScale;
-        p.vy += 0.25 * dtScale;
-        p.alpha -= 0.02 * dtScale; p.rot += p.vrot * dtScale;
-        if (p.alpha <= 0) p.active = false;
-      });
+      if (milestoneTimer > 0) milestoneTimer -= dtScale;
 
-      floaters.forEach(f => { f.y -= 1.5 * dtScale; f.alpha -= 0.02 * dtScale; });
+      // ── Boss Logic: Spaceship (Trigger: Multiples of 500) ──
+      const shipMilestone = Math.floor(score / 500);
+      if (shipMilestone > lastShipMilestone && !ship.active && state === 'running') {
+        lastShipMilestone = shipMilestone;
+        ship.active = true;
+        ship.state = 'entering';
+        ship.x = W + 200;
+        ship.y = H * 0.65;
+        ship.timer = 0;
+        ship.shootTimer = 0;
+        ship.shotsLeft = 3;
+      }
+
+      if (ship.active) {
+        if (ship.state === 'entering') {
+          ship.x -= 4 * dtScale;
+          ship.y = H * 0.65 + Math.sin(frameCount * 0.05) * 50;
+          if (ship.x <= W * 0.95) {
+            ship.state = 'aiming';
+            ship.shootTimer = 180; // 3 seconds for first shot
+          }
+        } else if (ship.state === 'aiming') {
+          ship.x = W * 0.95 + Math.sin(frameCount * 0.03) * 20;
+          ship.y = H * 0.65 + Math.cos(frameCount * 0.05) * 40;
+          ship.shootTimer -= dtScale;
+          if (ship.shootTimer <= 0) {
+            ship.state = 'firing';
+            ship.shotsLeft--;
+            // Target character's CURRENT position
+            rocket.active = true;
+            rocket.startX = ship.x;
+            rocket.startY = ship.y;
+            rocket.x = ship.x;
+            rocket.y = ship.y;
+            rocket.targetX = CHAR_X;
+            rocket.targetY = charY;
+            rocket.t = 0;
+            rocket.rot = Math.atan2(rocket.targetY - rocket.startY, rocket.targetX - rocket.startX);
+            ship.timer = 60; // cooldown after firing
+            
+            missileAudio.current.currentTime = 0;
+            missileAudio.current.play().catch(() => {});
+          }
+        } else if (ship.state === 'firing') {
+          ship.timer -= dtScale;
+          if (ship.timer <= 0) {
+            if (ship.shotsLeft > 0) {
+              ship.state = 'aiming';
+              ship.shootTimer = 90; // Faster shots for 2nd and 3rd (1.5s)
+            } else {
+              ship.state = 'leaving';
+            }
+          }
+        } else if (ship.state === 'leaving') {
+          ship.x += 8 * dtScale;
+          ship.y -= 2 * dtScale;
+          if (ship.x > W + 300) {
+            ship.active = false;
+          }
+        }
+      }
+
+      // Rocket Physics
+      if (rocket.active) {
+        // 2 seconds to reach target (120 frames at 60fps)
+        rocket.t += (dtScale / 120);
+        
+        // Comical move: ease in-out or simple linear?
+        // Let's use a slight curve or just direct lerp
+        rocket.x = rocket.startX + (rocket.targetX - rocket.startX) * rocket.t;
+        rocket.y = rocket.startY + (rocket.targetY - rocket.startY) * rocket.t;
+        
+        // Particles behind rocket
+        if (Math.random() > 0.3) {
+          spawnParticle(rocket.x - Math.cos(rocket.rot)*20, rocket.y - Math.sin(rocket.rot)*20, NEON_ORG, 3 + Math.random()*4);
+        }
+
+        if (rocket.t >= 1.0) {
+          // Explode at target
+          spawnExplosion(rocket.x, rocket.y);
+          explosionAudio.current.currentTime = 0;
+          explosionAudio.current.play().catch(() => {});
+          
+          rocket.active = false;
+          // Haptic feedback for explosion nearby
+          const distToChar = Math.sqrt((rocket.x - CHAR_X)**2 + (rocket.y - charY)**2);
+          if (distToChar < 150) vibrate(100);
+        }
+
+        // Collision with character
+        const dx = Math.abs(CHAR_X - rocket.x);
+        const dy = Math.abs(charY - rocket.y);
+        if (dx < 40 && dy < 40 && state === 'running') {
+          state = 'shocked';
+          setGameStatus('shocked');
+          shockTimer = 80; // Show explosion for 1.3s
+          bgAudio.current.pause();
+          explosionAudio.current.play().catch(() => {});
+          spawnExplosion(CHAR_X, charY);
+          vibrate([300, 100, 300]);
+        }
+      }
+
       floaters = floaters.filter(f => f.alpha > 0);
 
       // ── Jump Trail logic ──
-      if (!onGround) {
+      if (!onGround && state === 'running') {
         jumpTrail.push({ x: CHAR_X, y: charY + 15, alpha: 1.0 });
       }
-      jumpTrail.forEach(t => {
-        t.x -= move; // Trail moves with world
-        t.alpha -= 0.03 * dtScale;
-      });
-      jumpTrail = jumpTrail.filter(t => t.alpha > 0 && t.x > -50);
       if (jumpTrail.length > 25) jumpTrail.shift();
     }
 
@@ -1570,6 +1819,8 @@ export default function Game() {
       drawCoins();
       drawParticles();
       drawFloaters();
+      drawSpaceship();
+      drawRocket();
       drawCharacter();
       drawHUD();
 
