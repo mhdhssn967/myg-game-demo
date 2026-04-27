@@ -20,10 +20,12 @@ export default function Game() {
   
   const logoImg = useRef(new Image());
   const logoTransImg = useRef(new Image());
+  const magnetImg = useRef(new Image());
   const waveSheet = useRef(new Image());
   const logoLoaded = useRef(false);
   const logoTransLoaded = useRef(false);
   const waveLoaded = useRef(false);
+  const magnetLoaded = useRef(false);
 
   const products = ['iphone', 'fridge', 'washing_machine', 'ac', 'laptop', 'microwave', 'tv', 'headphone', 'viccum_cleaner', 'watch', 'blender'];
   const productImages = useRef({});
@@ -37,6 +39,7 @@ export default function Game() {
   const yayAudio = useRef(new Audio('/sounds/yay.mp3'));
   const lightningAudio = useRef(new Audio('/sounds/lightning.mp3'));
   const shockAudio = useRef(new Audio('/sounds/shock.mp3'));
+  const powerAudio = useRef(new Audio('/sounds/power.mp3'));
 
   useEffect(() => {
     const productList = ['iphone', 'fridge', 'washing_machine', 'ac', 'laptop', 'microwave', 'tv', 'headphone', 'viccum_cleaner', 'watch', 'blender'];
@@ -49,6 +52,7 @@ export default function Game() {
       { ref: waveSheet, src: waveSprite, flag: waveLoaded },
       { ref: logoImg, src: '/images/Glogo.png', flag: logoLoaded },
       { ref: logoTransImg, src: '/images/mygtrans.png', flag: logoTransLoaded },
+      { ref: magnetImg, src: '/images/magnet.svg', flag: magnetLoaded },
     ];
 
     const audioAssetsList = [
@@ -59,6 +63,7 @@ export default function Game() {
       { ref: yayAudio, src: '/sounds/yay.mp3', vol: 0.8 },
       { ref: lightningAudio, src: '/sounds/lightning.mp3', vol: 0.6 },
       { ref: shockAudio, src: '/sounds/shock.mp3', vol: 0.9 },
+      { ref: powerAudio, src: '/sounds/power.mp3', vol: 0.9 },
     ];
 
     const totalToLoad = imageAssets.length + productList.length + 14 + audioAssetsList.length;
@@ -193,6 +198,8 @@ export default function Game() {
     let animId;
     let introTimer = 0; // 0 to 30s
     let shockTimer = 0; // for the shocked animation
+    let magnetTimer = 0; // magnet powerup duration
+    let magnets = [];
 
     // ── Generate buildings ────────────────────────────────────────────────
     function genBuildings(count, totalW, minH, maxH, minWid, maxWid) {
@@ -779,9 +786,28 @@ export default function Game() {
         }
       }
 
+      // Magnetic rings
+      if (magnetTimer > 0) {
+        ctx.save();
+        ctx.translate(CHAR_X, charY + 15);
+        for (let i = 1; i <= 3; i++) {
+          ctx.beginPath();
+          ctx.arc(0, 0, 40 + i * 15 + Math.sin(frameCount * 0.1) * 5, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(255, 0, 0, ${0.4 / i})`;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
       ctx.translate(CHAR_X + jitterX, charY + 15 + jitterY);
       if (state === 'running' && !onGround) ctx.rotate(velY * 0.025);
       
+      // Strobe effect for shock
+      if (state === 'shocked' && Math.floor(frameCount * 0.5) % 2 === 0) {
+        ctx.filter = 'invert(1) brightness(1.5)';
+      }
+
       // If shocked, we use a single frame of the running sheet
       const currentSheet = sheet;
       const currentCols = cols;
@@ -792,6 +818,7 @@ export default function Game() {
         (currentFrame % currentCols) * fw, Math.floor(currentFrame / currentCols) * fh, fw, fh,
         -drawW / 2, -drawH / 2, drawW, drawH
       );
+      ctx.filter = 'none';
       ctx.restore();
     }
 
@@ -1165,6 +1192,7 @@ export default function Game() {
       nextGroundIn = 0;
       coins = []; coinsCollected = 0;
       lastMilestone = 0; milestoneTimer = 0;
+      magnets = []; magnetTimer = 0;
       particles = []; floaters = []; jumpTrail = []; state = 'running';
       setGameStatus('running');
       introTimer = 0; shockTimer = 0;
@@ -1178,6 +1206,10 @@ export default function Game() {
       
       if (state === 'shocked') {
         shockTimer -= dtScale;
+        // Continuous pulsed vibration
+        if (navigator.vibrate && Math.floor(frameCount) % 10 === 0) {
+          navigator.vibrate(60);
+        }
         if (shockTimer <= 0) {
           state = 'dead';
           setGameStatus('dead');
@@ -1285,8 +1317,12 @@ export default function Game() {
         platforms.push({ x: px, y: py, w: pw });
         
         // Spawn items on the platform
-        // Spawn items on the platform in a straight line
-        if (Math.random() > 0.4) {
+        // Spawn items on the platform (EXCLUSIVE: Either coins OR rare magnet)
+        if (Math.random() > 0.92) {
+          // Spawn Magnet
+          magnets.push({ x: px, y: py - 50 });
+        } else if (Math.random() > 0.4) {
+          // Spawn Coins
           const coinCount = 3 + Math.floor(Math.random() * 3);
           const pxStart = px - pw/2 + 20;
           for (let i = 0; i < coinCount; i++) {
@@ -1323,8 +1359,12 @@ export default function Game() {
         groundSegments.push({ x: gx, w: gw });
         
         // Spawn coins on ground
-        // Spawn coins on ground in a straight line
-        if (Math.random() > 0.5) {
+        // Spawn items on ground (EXCLUSIVE: Either coins OR rare magnet)
+        if (Math.random() > 0.94) {
+          // Spawn Magnet
+          magnets.push({ x: gx + 200, y: GROUND_Y - 50 });
+        } else if (Math.random() > 0.5) {
+          // Spawn Coins
           const coinCount = 5 + Math.floor(Math.random() * 3);
           const gxStart = gx + 20;
           for (let i = 0; i < coinCount; i++) {
@@ -1343,6 +1383,9 @@ export default function Game() {
 
       groundSegments.forEach(g => g.x -= move);
       groundSegments = groundSegments.filter(g => g.x + g.w > -400);
+
+      magnets.forEach(m => m.x -= move);
+      magnets = magnets.filter(m => m.x > -100);
 
       platforms.forEach(p => p.x -= move);
       platforms = platforms.filter(p => p.x > -p.w);
@@ -1383,7 +1426,37 @@ export default function Game() {
         coins.push({ x: W + 100, y: GROUND_Y - 200 - Math.random() * 100, special: true, collected: false });
       }
 
-      coins.forEach(c => c.x -= move);
+      coins.forEach(c => {
+        if (magnetTimer > 0 && !c.collected) {
+           // Only attract if coin is visible on screen
+           if (c.x < W) {
+             const dx = (CHAR_X - c.x);
+             const dy = (charY - c.y);
+             const dist = Math.sqrt(dx*dx + dy*dy);
+             if (dist < 350) {
+               c.x += (dx / dist) * 12 * dtScale;
+               c.y += (dy / dist) * 12 * dtScale;
+             }
+           }
+        }
+        c.x -= move;
+      });
+
+      // Magnet collision
+      magnets.forEach(m => {
+        const dx = Math.abs(CHAR_X - m.x);
+        const dy = Math.abs(charY - m.y);
+        if (dx < 40 && dy < 40) {
+          magnetTimer = 900; // 15 seconds at 60fps
+          powerAudio.current.currentTime = 0;
+          powerAudio.current.play().catch(() => {});
+          m.collected = true;
+          spawnParticles(m.x, m.y, '#ff0000', 20, true);
+        }
+      });
+      magnets = magnets.filter(m => !m.collected);
+      if (magnetTimer > 0) magnetTimer -= dtScale;
+
       coins = coins.filter(c => c.x > -100 && !c.collected);
 
       coins.forEach(c => {
@@ -1494,14 +1567,47 @@ export default function Game() {
       drawPlatforms();
       drawJumpTrail();
       drawObstacles();
+      drawMagnets();
       drawCoins();
       drawParticles();
       drawFloaters();
       drawCharacter();
       drawHUD();
 
+      // Magnet Timer HUD
+      if (magnetTimer > 0) {
+        ctx.save();
+        const tx = W - 60, ty = 80;
+        ctx.translate(tx, ty);
+        
+        // Progress ring
+        ctx.beginPath();
+        ctx.arc(0, 0, 25, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 25, -Math.PI/2, -Math.PI/2 + (magnetTimer/900) * Math.PI * 2);
+        ctx.strokeStyle = '#ff0000';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        // Magnet Icon (SVG)
+        if (magnetLoaded.current) {
+          ctx.drawImage(magnetImg.current, -12, -12, 24, 24);
+        } else {
+          ctx.beginPath();
+          ctx.lineWidth = 4;
+          ctx.strokeStyle = '#ff0000';
+          ctx.arc(0, 5, 10, 0, Math.PI);
+          ctx.stroke();
+        }
+        
+        ctx.restore();
+      }
+
       // ── Overlays ──
-      // Canvas-based idle overlay removed in favor of React-based StartScreen
       if (state === 'dead') drawGameOver();
 
       if (milestoneTimer > 0) {
@@ -1513,6 +1619,33 @@ export default function Game() {
         ctx.fillText(milestoneText, W / 2, H / 2 - 50);
         ctx.restore();
       }
+    }
+
+    function drawMagnets() {
+      magnets.forEach(m => {
+        ctx.save();
+        ctx.translate(m.x, m.y);
+        ctx.rotate(Math.sin(frameCount * 0.1) * 0.2);
+        
+        const size = 40;
+        if (magnetLoaded.current) {
+          ctx.drawImage(magnetImg.current, -size/2, -size/2, size, size);
+        } else {
+          // Fallback
+          ctx.lineWidth = 6;
+          ctx.strokeStyle = '#ff0000';
+          ctx.beginPath();
+          ctx.arc(0, 0, 15, 0, Math.PI);
+          ctx.stroke();
+        }
+        
+        // Glow
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#ff0000';
+        if (!magnetLoaded.current) ctx.stroke();
+
+        ctx.restore();
+      });
     }
 
     let lastTime = 0;
