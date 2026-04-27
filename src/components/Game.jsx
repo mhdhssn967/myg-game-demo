@@ -207,9 +207,11 @@ export default function Game() {
       } else if (charY <= 0) {
         charY = GROUND_Y - CHAR_SIZE / 2;
       }
+      
+      // Re-render cached backgrounds on resize
+      if (typeof initBackgroundBitmaps === 'function') initBackgroundBitmaps();
     };
     window.addEventListener('resize', updateSize);
-    updateSize();
 
     // ── Cyberpunk Palette ─────────────────────────────────────────────────
     const SKY_TOP    = '#03010a';   // night deep space
@@ -254,6 +256,114 @@ export default function Game() {
     let magnetTimer = 0; // magnet powerup duration
     let magnets = [];
 
+    // ── Task 3: Object Pooling ────────────────────────────────────────────
+    const COIN_POOL_SIZE = 80;
+    const coinPool = Array.from({ length: COIN_POOL_SIZE }, () => ({
+      active: false, x: 0, y: 0, collected: false, special: false, w: 1
+    }));
+    
+    const PARTICLE_POOL_SIZE = 150;
+    const particlePool = Array.from({ length: PARTICLE_POOL_SIZE }, () => ({
+      active: false, x: 0, y: 0, vx: 0, vy: 0, alpha: 0, color: '', s: 0, rot: 0, vrot: 0, drag: 1
+    }));
+
+    const OBSTACLE_POOL_SIZE = 15;
+    const obstaclePool = Array.from({ length: OBSTACLE_POOL_SIZE }, () => ({
+      active: false, x: 0, y: 0, w: 0, h: 0, productType: '', onPlatform: false, platformY: 0
+    }));
+
+    // Task 4: Reusable references for vector math
+    const _vec = { x: 0, y: 0 };
+    const _rect = { x: 0, y: 0, w: 0, h: 0 };
+
+    function spawnCoin(x, y, special = false) {
+      const c = coinPool.find(coin => !coin.active);
+      if (c) {
+        c.active = true; c.x = x; c.y = y; c.collected = false; c.special = special;
+      }
+    }
+
+    function spawnParticle(x, y, color = null, size = null, isSpecial = false) {
+      const p = particlePool.find(part => !part.active);
+      if (p) {
+        p.active = true; p.x = x; p.y = y;
+        p.vx = (Math.random() - 0.5) * (isSpecial ? 15 : 8);
+        p.vy = (Math.random() - 0.5) * (isSpecial ? 15 : 8) - 2;
+        p.alpha = 1.0;
+        p.color = color || (Math.random() > 0.5 ? NEON_ORG : NEON_PRP);
+        p.s = size || (2 + Math.random() * 5);
+        p.rot = Math.random() * Math.PI * 2;
+        p.vrot = (Math.random() - 0.5) * 0.2;
+        p.drag = 0.95 + Math.random() * 0.04;
+      }
+    }
+
+    function spawnObstacle(x, y, w, h, type, onPlatform = false, platformY = 0) {
+      const o = obstaclePool.find(obs => !obs.active);
+      if (o) {
+        o.active = true; o.x = x; o.y = y; o.w = w; o.h = h;
+        o.productType = type; o.onPlatform = onPlatform; o.platformY = platformY;
+      }
+    }
+
+    // ── Task 1: Offscreen Background Rendering ───────────────────────────
+    const bgCanvases = {
+      ghost: document.createElement('canvas'),
+      far:   document.createElement('canvas'),
+      mid:   document.createElement('canvas'),
+      near:  document.createElement('canvas')
+    };
+
+    function preRenderBuildings(canvas, arr, totalW, bodyColor, opacity, showWindows, showNeon) {
+      canvas.width = totalW;
+      canvas.height = H;
+      const tctx = canvas.getContext('2d');
+      tctx.clearRect(0, 0, totalW, H);
+      
+      arr.forEach(b => {
+        const bx = b.x;
+        const by = GROUND_Y - b.h;
+        tctx.globalAlpha = opacity;
+        tctx.fillStyle = bodyColor;
+        tctx.fillRect(bx, by, b.w, H - by);
+
+        if (showNeon) {
+          tctx.fillStyle = b.glowColor;
+          tctx.fillRect(bx - 1, by, b.w + 2, 3);
+        }
+
+        if (showWindows && b.windowCols > 0) {
+          const winW = 4, winH = 6;
+          const cols = Math.max(1, Math.floor(b.w / 12));
+          const rows = Math.max(1, Math.floor(b.h / 14));
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+              const lit = ((r * 7 + c * 13 + Math.floor(b.windowOffset * 30)) % 5) !== 0;
+              if (!lit) continue;
+              const wx = bx + 5 + c * 12;
+              const wy = by + 8 + r * 14;
+              tctx.globalAlpha = opacity * 0.6;
+              tctx.fillStyle = ((r + c) % 2 === 0) ? NEON_ORG : NEON_PRP;
+              tctx.fillRect(wx, wy, winW, winH);
+            }
+          }
+        }
+      });
+    }
+
+    const initBackgroundBitmaps = () => {
+      preRenderBuildings(bgCanvases.ghost, bldGhost, WORLD_W * 3.5, '#07040f', 0.55, false, false);
+      preRenderBuildings(bgCanvases.far,   bldFar,   WORLD_W * 3,   '#0d0820', 0.70, false, true);
+      preRenderBuildings(bgCanvases.mid,   bldMid,   WORLD_W * 2.5, '#120d26', 0.85, true,  true);
+      preRenderBuildings(bgCanvases.near,  bldNear,  WORLD_W * 2,   '#1a0d18', 0.95, true,  true);
+    };
+
+    function drawCachedLayer(canvas, scroll, totalW) {
+      const s = (scroll % totalW + totalW) % totalW;
+      ctx.drawImage(canvas, -s, 0);
+      ctx.drawImage(canvas, totalW - s, 0);
+    }
+
     // ── Generate buildings ────────────────────────────────────────────────
     function genBuildings(count, totalW, minH, maxH, minWid, maxWid) {
       return Array.from({ length: count }, (_, i) => ({
@@ -296,6 +406,10 @@ export default function Game() {
     // Billboards
     const adsMid  = genBillboards(8, WORLD_W * 2.5, H * 0.2, H * 0.5);
     const adsNear = genBillboards(6, WORLD_W * 2,   H * 0.1, H * 0.4);
+
+    // Initial size setup and background bitmap generation
+    updateSize();
+    initBackgroundBitmaps();
 
     // Street lights
     const streetLights = Array.from({ length: 12 }, (_, i) => ({
@@ -420,97 +534,6 @@ export default function Game() {
         ctx.globalAlpha = 0.35 + 0.2 * Math.sin(frameCount * 0.05 + p.phase);
         ctx.fillStyle = p.color;
         ctx.beginPath(); ctx.arc(px, py, p.r, 0, Math.PI * 2); ctx.fill();
-      });
-      ctx.restore();
-    }
-
-    // ── DRAW: Building layer ──────────────────────────────────────────────
-    function drawBuildings(arr, scroll, totalW, bodyColor, opacity, showWindows, showNeon) {
-      const s = (scroll % totalW + totalW) % totalW;
-      ctx.save();
-      ctx.globalAlpha = opacity;
-
-      [-s - totalW, -s, totalW - s].forEach(offsetX => {
-        arr.forEach(b => {
-          const bx = offsetX + b.x;
-          const by = GROUND_Y - b.h;
-          if (bx > W + b.w || bx + b.w < -10) return;
-
-          // ── Main body (Extends to bottom for depth in gaps) ──
-          ctx.globalAlpha = opacity;
-          ctx.fillStyle = bodyColor;
-          ctx.fillRect(bx, by, b.w, H - by);
-
-          // ── Neon top trim ──
-          if (showNeon) {
-            ctx.globalAlpha = opacity * 0.9;
-            ctx.fillStyle = b.glowColor;
-            ctx.fillRect(bx - 1, by, b.w + 2, 3);
-
-            // Glow bloom on top edge
-            ctx.globalAlpha = opacity * 0.25;
-            const topGlow = ctx.createLinearGradient(bx, by - 12, bx, by + 6);
-            topGlow.addColorStop(0, 'rgba(0,0,0,0)');
-            topGlow.addColorStop(1, b.glowColor);
-            ctx.fillStyle = topGlow;
-            ctx.fillRect(bx - 2, by - 12, b.w + 4, 15);
-          }
-
-          // ── Antenna ──
-          if (b.hasAntenna && showNeon) {
-            ctx.globalAlpha = opacity * 0.8;
-            ctx.fillStyle = bodyColor;
-            const aH = 12 + b.w * 0.15;
-            ctx.fillRect(bx + b.w / 2 - 1.5, by - aH, 3, aH);
-            // Blinking tip
-            const blink = Math.sin(frameCount * 0.08 + b.windowOffset * 10) > 0.3;
-            if (blink) {
-              ctx.globalAlpha = opacity * 0.95;
-              ctx.fillStyle = b.glowColor;
-              ctx.beginPath();
-              ctx.arc(bx + b.w / 2, by - aH - 2, 2.5, 0, Math.PI * 2);
-              ctx.fill();
-            }
-          }
-
-          // ── Windows ──
-          if (showWindows && b.windowCols > 0) {
-            const winW = 4, winH = 6;
-            const cols = Math.max(1, Math.floor(b.w / 12));
-            const rows = Math.max(1, Math.floor(b.h / 14));
-            for (let r = 0; r < rows; r++) {
-              for (let c = 0; c < cols; c++) {
-                // Deterministic pseudo-random using offset so it doesn't flicker every frame
-                const lit = ((r * 7 + c * 13 + Math.floor(b.windowOffset * 30)) % 5) !== 0;
-                if (!lit) continue;
-                const wx = bx + 5 + c * 12;
-                const wy = by + 8 + r * 14;
-                // Alternate orange/purple windows
-                const wColor = ((r + c) % 2 === 0) ? NEON_ORG : NEON_PRP;
-                ctx.globalAlpha = opacity * (0.4 + 0.3 * Math.sin(frameCount * 0.03 + r + c));
-                ctx.fillStyle = wColor;
-                ctx.fillRect(wx, wy, winW, winH);
-              }
-            }
-          }
-
-          // ── Building Logo ──
-          if (b.showLogo) {
-            const img = logoTransImg.current;
-            const loaded = logoTransLoaded.current;
-            
-            if (loaded) {
-              ctx.save();
-              ctx.globalAlpha = opacity * 0.9;
-              const logoSize = Math.min(b.w * 0.8, 120);
-              // Neon glow for building logo
-              
-              
-              ctx.drawImage(img, bx + b.w/2 - logoSize/2, by + b.h/4, logoSize, logoSize);
-              ctx.restore();
-            }
-          }
-        });
       });
       ctx.restore();
     }
@@ -910,26 +933,17 @@ export default function Game() {
       });
     }
 
-    // ── DRAW: Obstacles (Electronic Products) ───────────────────────────
     function drawObstacles() {
-      obstacles.forEach(o => {
+      obstaclePool.forEach(o => {
+        if (!o.active) return;
         const img = productImages.current[o.productType];
         if (img) {
           ctx.save();
-          // Glow effect for products
-          
-          
-          
-          // Maintain original aspect ratio
           const aspect = img.width / img.height;
           const drawW = o.h * aspect;
           const surfaceY = o.onPlatform ? o.platformY : GROUND_Y;
           ctx.drawImage(img, o.x - drawW / 2, surfaceY - o.h, drawW, o.h);
           ctx.restore();
-        } else {
-          // Fallback if image not loaded yet
-          ctx.fillStyle = NEON_ORG;
-          ctx.fillRect(o.x - o.w / 2, GROUND_Y - o.h, o.w, o.h);
         }
       });
     }
@@ -955,8 +969,8 @@ export default function Game() {
 
     // ── DRAW: Coins (unchanged logic, kept as-is) ─────────────────────────
     function drawCoins() {
-      coins.forEach(c => {
-        if (c.collected) return;
+      coinPool.forEach(c => {
+        if (!c.active) return;
         ctx.save();
         ctx.translate(c.x, c.y);
         const isSpecial = !!c.special;
@@ -965,26 +979,12 @@ export default function Game() {
         const rad = isSpecial ? 20 : 14;
         const lSize = isSpecial ? 24 : 16;
 
-        // myG branded coin
+        // Neon Glow
         const glowRad = isSpecial ? 35 : 20;
         const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, glowRad);
         glow.addColorStop(0, isSpecial ? 'rgba(255,107,0,0.8)' : 'rgba(255,107,0,0.6)');
         glow.addColorStop(1, 'rgba(255,107,0,0)');
         ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, glowRad, 0, Math.PI * 2); ctx.fill();
-
-        // Electrifying lightning sparks for special coins
-        if (isSpecial && Math.random() > 0.6) {
-          ctx.strokeStyle = '#fff';
-          ctx.lineWidth = 1;
-          for (let i = 0; i < 2; i++) {
-            const ang = Math.random() * Math.PI * 2;
-            const dist = rad + 2 + Math.random() * 12;
-            ctx.beginPath();
-            ctx.moveTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
-            ctx.lineTo(Math.cos(ang) * dist, Math.sin(ang) * dist);
-            ctx.stroke();
-          }
-        }
 
         ctx.scale(w, 1);
         ctx.fillStyle = NEON_ORG;
@@ -992,28 +992,39 @@ export default function Game() {
         ctx.lineWidth = isSpecial ? 4 : 3;
         ctx.beginPath(); ctx.arc(0, 0, rad, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 
-        // Inner rim
-        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-        ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.arc(0, 0, rad * 0.8, 0, Math.PI * 2); ctx.stroke();
-
-        // myG Logo on Coin
         if (logoLoaded.current) {
           ctx.drawImage(logoImg.current, -lSize / 2, -lSize / 2, lSize, lSize);
-        } else {
-          ctx.fillStyle = '#fff';
-          ctx.font = `900 ${isSpecial ? 16 : 12}px "Exo 2"`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('G', 0, 0);
         }
-        
         ctx.restore();
+
+        // Collision check
+        const dx = Math.abs(CHAR_X - c.x);
+        const dy = Math.abs(charY - c.y);
+        if (dx < 40 && dy < 40 && !c.collected) {
+          c.collected = true;
+          c.active = false;
+          if (isSpecial) {
+            coinsCollected += 10;
+            score += 50;
+            floaters.push({ x: c.x, y: c.y, text: '+10', alpha: 1.0 });
+            yayAudio.current.currentTime = 0;
+            yayAudio.current.play().catch(() => {});
+          } else {
+            coinsCollected++;
+            score += 10;
+            coinAudio.current.currentTime = 0;
+            coinAudio.current.play().catch(() => {});
+          }
+          for (let i = 0; i < (isSpecial ? 25 : 5); i++) {
+            spawnParticle(c.x, c.y, isSpecial ? '#fff' : NEON_ORG, isSpecial ? 4 + Math.random() * 6 : null, isSpecial);
+          }
+        }
       });
     }
 
     function drawParticles() {
-      particles.forEach(p => {
+      particlePool.forEach(p => {
+        if (!p.active) return;
         ctx.save();
         ctx.globalAlpha = p.alpha;
         ctx.fillStyle = p.color;
@@ -1072,23 +1083,6 @@ export default function Game() {
         ctx.fillText(f.text, f.x, f.y);
         ctx.restore();
       });
-    }
-
-    function spawnParticles(x, y, color, count = 8, isSpecial = false) {
-      for (let i = 0; i < count; i++) {
-        const speedMult = isSpecial ? 1.5 : 1;
-        particles.push({
-          x, y,
-          vx: (Math.random() - 0.5) * 8 * speedMult,
-          vy: (Math.random() - 0.5) * 10 * speedMult - (isSpecial ? 5 : 2),
-          s: isSpecial ? 6 + Math.random() * 8 : 3 + Math.random() * 5,
-          alpha: 1,
-          rot: Math.random() * Math.PI * 2,
-          vrot: (Math.random() - 0.5) * 0.4,
-          color: color || (isSpecial ? NEON_ORG : ['#ff6b00', '#fff', '#9b30ff'][Math.floor(Math.random() * 3)]),
-          drag: isSpecial ? 0.96 : 0.98,
-        });
-      }
     }
 
     // ── DRAW: HUD (cyberpunk reskin) ──────────────────────────────────────
@@ -1391,17 +1385,11 @@ export default function Game() {
           // Spawn Magnet
           magnets.push({ x: px, y: py - 50 });
         } else if (Math.random() > 0.4) {
-          // Spawn Coins
-          const coinCount = 3 + Math.floor(Math.random() * 3);
-          const pxStart = px - pw/2 + 20;
+          // Spawn Normal Coins in a neat line
+          const coinCount = Math.floor(pw / 60) - 1;
+          const pxStart = px - pw/2 + 30;
           for (let i = 0; i < coinCount; i++) {
-            const isSpecial = Math.random() > 0.9;
-            coins.push({ 
-              x: pxStart + i * (pw / coinCount), 
-              y: isSpecial ? py - 140 : py - 40, 
-              collected: false,
-              special: isSpecial
-            });
+            spawnCoin(pxStart + i * 60, py - 40, false);
           }
         }
         
@@ -1432,18 +1420,10 @@ export default function Game() {
         if (Math.random() > 0.94) {
           // Spawn Magnet
           magnets.push({ x: gx + 200, y: GROUND_Y - 50 });
-        } else if (Math.random() > 0.5) {
-          // Spawn Coins
-          const coinCount = 5 + Math.floor(Math.random() * 3);
-          const gxStart = gx + 20;
-          for (let i = 0; i < coinCount; i++) {
-            const isSpecial = Math.random() > 0.9;
-            coins.push({ 
-              x: gxStart + i * 60, 
-              y: isSpecial ? GROUND_Y - 140 : GROUND_Y - 40, 
-              collected: false,
-              special: isSpecial
-            });
+        } else if (Math.random() > 0.6) {
+          // Occasional single special coin high up over gaps
+          if (Math.random() > 0.7) {
+            spawnCoin(gx + gw/2, GROUND_Y - 260, true);
           }
         }
         
@@ -1459,45 +1439,39 @@ export default function Game() {
       platforms.forEach(p => p.x -= move);
       platforms = platforms.filter(p => p.x > -p.w);
       
-      // Update obstacles on platforms
-      obstacles.forEach(o => {
+      // Update obstacles (Task 3: Pooling)
+      obstaclePool.forEach(o => {
+        if (!o.active) return;
         o.x -= move;
-        if (o.onPlatform) {
-          // Keep it synced with platform vertical height
-          // (Though in this game they are static in Y, so no extra work needed)
-        }
-      });
-      obstacles = obstacles.filter(o => o.x > -100);
-
-      if (Math.random() < 0.009 * dtScale && nextObstacleIn > 120) {
-        const count = 5 + Math.floor(Math.random() * 3);
-        const startX = W + 300;
-        
-        // Choose a baseline height (Ground or Platform level)
-        const onPlatform = Math.random() > 0.5;
-        const baseLine = onPlatform ? GROUND_Y - 140 : GROUND_Y;
-        const safe = !obstacles.some(o => Math.abs(o.x - startX) < 150);
-        
-        if (safe) {
-          for (let i = 0; i < count; i++) {
-            const isSpecial = Math.random() > 0.9;
-            coins.push({ 
-              x: startX + i * 50, 
-              y: isSpecial ? baseLine - 140 : baseLine - 40, 
-              collected: false,
-              special: isSpecial
-            });
+        if (o.x < -200) {
+          o.active = false;
+        } else if (state === 'running') {
+          const img = productImages.current[o.productType];
+          const actualW = img ? (o.h * (img.width / img.height)) : o.w;
+          const dx = Math.abs(CHAR_X - o.x);
+          const surfaceY = o.onPlatform ? o.platformY : GROUND_Y;
+          const dy = Math.abs(charY - (surfaceY - o.h / 2));
+          if (dx < (CHAR_SIZE * 0.2 + actualW * 0.4) && dy < (CHAR_SIZE * 0.3 + o.h * 0.4)) {
+            state = 'dead';
+            setGameStatus('dead');
+            bgAudio.current.pause();
+            if (score > bestScore) bestScore = score;
           }
         }
+      });
+
+      // Rare High-Altitude Special Coins
+      if (Math.random() < 0.003 * dtScale) {
+        spawnCoin(W + 100, GROUND_Y - 280 - Math.random() * 80, true);
       }
 
-      if (Math.random() < 0.002 * dtScale && !coins.some(c => c.special)) {
-        coins.push({ x: W + 100, y: GROUND_Y - 200 - Math.random() * 100, special: true, collected: false });
-      }
-
-      coins.forEach(c => {
+      // Update Coins (Task 3: Pooling)
+      coinPool.forEach(c => {
+        if (!c.active) return;
+        c.x -= move;
+        if (c.x < -100) c.active = false;
+        
         if (magnetTimer > 0 && !c.collected) {
-           // Only attract if coin is visible on screen
            if (c.x < W) {
              const dx = (CHAR_X - c.x);
              const dy = (charY - c.y);
@@ -1508,7 +1482,6 @@ export default function Game() {
              }
            }
         }
-        c.x -= move;
       });
 
       // Magnet collision
@@ -1520,54 +1493,33 @@ export default function Game() {
           powerAudio.current.currentTime = 0;
           powerAudio.current.play().catch(() => {});
           m.collected = true;
-          spawnParticles(m.x, m.y, '#ff0000', 20, true);
+          spawnParticle(m.x, m.y, '#ff0000', 20, true);
         }
       });
       magnets = magnets.filter(m => !m.collected);
       if (magnetTimer > 0) magnetTimer -= dtScale;
 
-      coins = coins.filter(c => c.x > -100 && !c.collected);
-
-      coins.forEach(c => {
-        if (!c.collected) {
-          const dx = Math.abs(CHAR_X - c.x);
-          const dy = Math.abs((charY + 15) - c.y);
-          const range = c.special ? 35 : 30;
-          if (dx < range && dy < range) {
-            c.collected = true;
-            if (c.special) {
-              coinsCollected += 10; score += 100;
-              spawnParticles(c.x, c.y, null, 50, true);
-              floaters.push({ x: c.x, y: c.y, text: '+10', alpha: 1 });
-              bonusAudio.current.currentTime = 0;
-              bonusAudio.current.play().catch(() => {});
-            } else {
-              coinsCollected++; score += 10;
-              spawnParticles(c.x, c.y, NEON_ORG);
-              coinAudio.current.currentTime = 0;
-              coinAudio.current.play().catch(() => {});
-            }
-          }
-        }
-      });
-
+      // Milestones
       if (coinsCollected > 0 && Math.floor(coinsCollected / 100) > lastMilestone) {
         lastMilestone = Math.floor(coinsCollected / 100);
         milestoneText = `${lastMilestone * 100} COINS!`;
         milestoneTimer = 120;
-        for (let i = 0; i < 3; i++) spawnParticles(W / 2 + (i - 1) * 50, H / 2, null, 40, true);
+        for (let i = 0; i < 3; i++) spawnParticle(W / 2 + (i - 1) * 50, H / 2, null, 40, true);
         yayAudio.current.currentTime = 0;
         yayAudio.current.play().catch(() => {});
       }
       if (milestoneTimer > 0) milestoneTimer -= dtScale;
 
-      particles.forEach(p => {
+      // Update Particles (Task 3: Pooling)
+      particlePool.forEach(p => {
+        if (!p.active) return;
         p.vx *= (p.drag || 1);
         p.x += p.vx * dtScale; p.y += p.vy * dtScale;
         p.vy += 0.25 * dtScale;
         p.alpha -= 0.02 * dtScale; p.rot += p.vrot * dtScale;
+        if (p.alpha <= 0) p.active = false;
       });
-      particles = particles.filter(p => p.alpha > 0);
+
       floaters.forEach(f => { f.y -= 1.5 * dtScale; f.alpha -= 0.02 * dtScale; });
       floaters = floaters.filter(f => f.alpha > 0);
 
@@ -1581,25 +1533,6 @@ export default function Game() {
       });
       jumpTrail = jumpTrail.filter(t => t.alpha > 0 && t.x > -50);
       if (jumpTrail.length > 25) jumpTrail.shift();
-
-      obstacles.forEach(o => o.x -= move);
-      obstacles = obstacles.filter(o => o.x > -100);
-
-      /*
-      if (obstacles.some(o => {
-        const img = productImages.current[o.productType];
-        const actualW = img ? (o.h * (img.width / img.height)) : o.w;
-        const dx = Math.abs(CHAR_X - o.x);
-        const surfaceY = o.onPlatform ? o.platformY : GROUND_Y;
-        const dy = Math.abs(charY - (surfaceY - o.h / 2));
-        // Use a tighter hitbox for better gameplay
-        return dx < (CHAR_SIZE * 0.2 + actualW * 0.4) && dy < (CHAR_SIZE * 0.3 + o.h * 0.4);
-      })) {
-        state = 'dead';
-        bgAudio.current.pause();
-        if (score > bestScore) bestScore = score;
-      }
-      */
     }
 
     function draw() {
@@ -1611,20 +1544,16 @@ export default function Game() {
       drawCelestial();
       drawNeonDust();
 
-      // ── Parallax building layers: farthest → nearest ──
-      // Ghost silhouettes — very dark, near-black
-      drawBuildings(bldGhost, scrollFar * 0.15, WORLD_W * 3.5, '#07040f', 0.55, false, false);
-      // Far city — dark purple, no windows
-      drawBuildings(bldFar,   scrollFar * 0.3,  WORLD_W * 3,   '#0d0820', 0.70, false, true);
-      // Mid city — sparse windows + billboards
-      const isIntro = (introTimer / 60) <= 30;
+      // ── Parallax building layers (Task 1) ──
+      drawCachedLayer(bgCanvases.ghost, scrollFar * 0.15, WORLD_W * 3.5);
+      drawCachedLayer(bgCanvases.far,   scrollFar * 0.3,  WORLD_W * 3);
       
-      // Render mid layers only if not on a low-end device (Task 10)
+      const isIntro = (introTimer / 60) <= 30;
       if (!isIntro && !isLowEnd) {
         drawBillboards(adsMid, scrollMid * 0.6, WORLD_W * 2.5, 0.5);
-        drawBuildings(bldMid,   scrollMid * 0.6,  WORLD_W * 2.5, '#120d26', 0.85, true,  true);
+        drawCachedLayer(bgCanvases.mid, scrollMid * 0.6,  WORLD_W * 2.5);
         drawBillboards(adsNear, scrollNear, WORLD_W * 2, 0.85);
-        drawBuildings(bldNear,  scrollNear,        WORLD_W * 2,   '#1a0d18', 0.95, true,  true);
+        drawCachedLayer(bgCanvases.near, scrollNear,        WORLD_W * 2);
       }
 
       if (state === 'running' && introTimer / 60 <= 30) drawBrandIntro();
