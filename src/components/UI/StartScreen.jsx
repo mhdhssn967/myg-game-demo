@@ -8,9 +8,13 @@ const StartScreen = ({ onStart }) => {
         {/* Top Glow Line */}
         <div style={styles.topGlow}></div>
         
-        {/* Title Section */}
+        {/* Logo Header Section */}
         <div style={styles.header}>
-          <h1 style={styles.title}>MYG RUNNER</h1>
+          <img 
+            src="/images/mygtrans.png" 
+            alt="myG Logo" 
+            style={styles.mainLogo} 
+          />
           <div style={styles.subtitleRow}>
              <div style={styles.subLine}></div>
              <span style={styles.subtitle}>THE DIGITAL HUB</span>
@@ -20,6 +24,7 @@ const StartScreen = ({ onStart }) => {
         
         {/* Waving Character Animation */}
         <div style={styles.characterSection}>
+          <div style={styles.characterBackglow}></div>
           <div style={styles.characterSprite}></div>
           <div style={styles.characterPlatform}></div>
         </div>
@@ -63,6 +68,27 @@ const StartScreen = ({ onStart }) => {
         <button 
           onClick={(e) => {
             e.stopPropagation();
+            
+            // Trigger Fullscreen
+            try {
+              const docEl = document.documentElement;
+              const requestFS = docEl.requestFullscreen || 
+                              docEl.webkitRequestFullscreen || 
+                              docEl.mozRequestFullScreen || 
+                              docEl.msRequestFullscreen;
+              
+              if (requestFS) {
+                requestFS.call(docEl).then(() => {
+                  // Attempt to lock orientation on mobile
+                  if (window.screen.orientation && window.screen.orientation.lock) {
+                    window.screen.orientation.lock('landscape').catch(() => {});
+                  }
+                }).catch(() => {});
+              }
+            } catch (err) {
+              console.warn("Fullscreen request failed:", err);
+            }
+
             onStart();
           }}
           style={styles.startButton}
@@ -74,10 +100,7 @@ const StartScreen = ({ onStart }) => {
           </svg>
         </button>
 
-        {/* Footer info */}
-        <div style={styles.footer}>
-           BEST EXPERIENCED IN LANDSCAPE
-        </div>
+       
       </div>
 
       <style>{`
@@ -98,6 +121,10 @@ const StartScreen = ({ onStart }) => {
         @keyframes start-fade-in {
           from { opacity: 0; transform: scale(0.9); }
           to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes start-logo-float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10px); }
         }
         @keyframes wave-sprite {
           0% { background-position: 0% 0%; }
@@ -172,22 +199,33 @@ const styles = {
     justifyContent: 'center',
     marginBottom: '-10px',
   },
+  characterBackglow: {
+    position: 'absolute',
+    width: '120px',
+    height: '120px',
+    background: 'radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%)',
+    borderRadius: '50%',
+    zIndex: 0,
+  },
   characterSprite: {
+    position: 'relative',
+    zIndex: 1,
     width: '120px',
     height: '120px',
     backgroundImage: `url(${waveSprite})`,
     backgroundSize: '500% 400%',
     animation: 'wave-sprite 1.2s steps(1) infinite',
-    filter: 'drop-shadow(0 0 10px rgba(255, 107, 0, 0.4))',
+    // Removed orange drop-shadow for limb clarity
   },
   characterPlatform: {
     position: 'absolute',
     bottom: '10px',
     width: '60px',
     height: '6px',
-    background: 'rgba(255, 107, 0, 0.2)',
+    background: 'rgba(255, 255, 255, 0.15)',
     borderRadius: '50%',
     filter: 'blur(4px)',
+    zIndex: 0,
   },
   topGlow: {
     position: 'absolute',
@@ -201,15 +239,15 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '4px',
+    gap: '12px',
+    marginBottom: '8px',
   },
-  title: {
-    fontSize: 'min(12vw, 48px)',
-    color: '#ff6b00',
-    lineHeight: 1,
-    margin: 0,
-    textShadow: '0 0 20px rgba(255, 107, 0, 0.5)',
-    textAlign: 'center',
+  mainLogo: {
+    width: 'auto',
+    height: 'min(15vh, 100px)',
+    objectFit: 'contain',
+    filter: 'drop-shadow(0 0 15px rgba(255, 107, 0, 0.6))',
+    animation: 'start-logo-float 3s ease-in-out infinite',
   },
   subtitleRow: {
     display: 'flex',
@@ -297,7 +335,7 @@ const styles = {
   startButton: {
     width: '100%',
     marginTop: '8px',
-    padding: '18px 24px',
+    padding: '15px 10px',
     background: '#ff6b00',
     color: 'white',
     border: 'none',
@@ -313,7 +351,7 @@ const styles = {
     boxSizing: 'border-box',
   },
   buttonText: {
-    fontSize: 'min(6vw, 22px)',
+    fontSize: 'min(4vw, 18px)',
     letterSpacing: '0.05em',
   },
   buttonIcon: {
