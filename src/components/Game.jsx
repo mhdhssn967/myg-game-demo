@@ -1,11 +1,19 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import Loader from './Loader';
 import runSprite from '../assets/run.png';
 import waveSprite from '../assets/wave.png';
 
 export default function Game() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const canvasRef = useRef(null);
   const spriteSheet = useRef(new Image());
   const spriteLoaded = useRef(false);
+  const isLoadingRef = useRef(true);
+  
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
   
   const logoImg = useRef(new Image());
   const logoTransImg = useRef(new Image());
@@ -27,40 +35,80 @@ export default function Game() {
   const lightningAudio = useRef(new Audio('/sounds/lightning.mp3'));
 
   useEffect(() => {
-    bgAudio.current.loop = true;
-    bgAudio.current.volume = 0.6;
-    jumpAudio.current.volume = 0.8;
-    coinAudio.current.volume = 0.5;
-    bonusAudio.current.volume = 0.7;
-    yayAudio.current.volume = 0.8;
-    lightningAudio.current.volume = 0.6;
+    const productList = ['iphone', 'fridge', 'washing_machine', 'ac', 'laptop', 'microwave', 'tv', 'headphone', 'viccum_cleaner', 'watch', 'blender'];
+    
+    // Reset lists to avoid duplication on hot reload
+    billboardImages.current = [];
+    
+    const imageAssets = [
+      { ref: spriteSheet, src: runSprite, flag: spriteLoaded },
+      { ref: waveSheet, src: waveSprite, flag: waveLoaded },
+      { ref: logoImg, src: '/images/Glogo.png', flag: logoLoaded },
+      { ref: logoTransImg, src: '/images/mygtrans.png', flag: logoTransLoaded },
+    ];
 
-    spriteSheet.current.src = runSprite;
-    spriteSheet.current.onload = () => { spriteLoaded.current = true; };
+    const audioAssetsList = [
+      { ref: bgAudio, src: '/sounds/bg.mp3', loop: true, vol: 0.6 },
+      { ref: jumpAudio, src: '/sounds/jump.mp3', vol: 0.8 },
+      { ref: coinAudio, src: '/sounds/coin.mp3', vol: 0.5 },
+      { ref: bonusAudio, src: '/sounds/bonus.mp3', vol: 0.7 },
+      { ref: yayAudio, src: '/sounds/yay.mp3', vol: 0.8 },
+      { ref: lightningAudio, src: '/sounds/lightning.mp3', vol: 0.6 },
+    ];
 
-    logoImg.current.src = '/images/Glogo.png';
-    logoImg.current.onload = () => { logoLoaded.current = true; };
+    const totalToLoad = imageAssets.length + productList.length + 14 + audioAssetsList.length;
+    let loadedCount = 0;
 
-    logoTransImg.current.src = '/images/mygtrans.png';
-    logoTransImg.current.onload = () => { logoTransLoaded.current = true; };
+    const incrementProgress = () => {
+      loadedCount++;
+      const progress = (loadedCount / totalToLoad) * 100;
+      setLoadingProgress(progress);
+      if (loadedCount >= totalToLoad) {
+        setTimeout(() => setIsLoading(false), 800); 
+      }
+    };
 
-    waveSheet.current.src = waveSprite;
-    waveSheet.current.onload = () => { waveLoaded.current = true; };
+    // Load main images
+    imageAssets.forEach(asset => {
+      asset.ref.current.src = asset.src;
+      asset.ref.current.onload = () => {
+        asset.flag.current = true;
+        incrementProgress();
+      };
+      asset.ref.current.onerror = incrementProgress;
+    });
 
-    products.forEach(p => {
+    // Load products
+    productList.forEach(p => {
       const img = new Image();
       img.src = `/images/products/${p}.png`;
       img.onload = () => {
         productImages.current[p] = img;
         productsLoaded.current++;
+        incrementProgress();
       };
+      img.onerror = incrementProgress;
     });
 
+    // Load billboards
     for (let i = 1; i <= 14; i++) {
       const img = new Image();
-      img.src = `/images/billboards/story${i}.png`;
+      const ext = (i === 13 || i === 14) ? 'jpg' : 'png';
+      img.src = `/images/billboards/story${i}.${ext}`;
       billboardImages.current.push(img);
+      img.onload = incrementProgress;
+      img.onerror = incrementProgress;
     }
+
+    // Load audio
+    audioAssetsList.forEach(asset => {
+      asset.ref.current.src = asset.src;
+      asset.ref.current.loop = asset.loop || false;
+      asset.ref.current.volume = asset.vol || 1;
+      asset.ref.current.addEventListener('canplaythrough', incrementProgress, { once: true });
+      asset.ref.current.addEventListener('error', incrementProgress, { once: true });
+      asset.ref.current.load();
+    });
 
     const unlockAudio = () => {
       bgAudio.current.play().then(() => {
@@ -161,7 +209,7 @@ export default function Game() {
         y: minY + Math.random() * (maxY - minY),
         w: 180 + Math.random() * 260, // Clearer poster size
         h: 120 + Math.random() * 160,
-        adIndex: Math.floor(Math.random() * 12),
+        adIndex: Math.floor(Math.random() * 14),
         floatOff: Math.random() * Math.PI * 2,
         flicker: Math.random(),
         glowColor: Math.random() > 0.5 ? NEON_ORG : NEON_PRP
@@ -1359,6 +1407,10 @@ export default function Game() {
 
     let lastTime = 0;
     function loop(now) {
+      if (isLoadingRef.current) {
+        animId = requestAnimationFrame(loop);
+        return;
+      }
       const dt = lastTime ? (now - lastTime) / 16.67 : 1;
       lastTime = now;
       update(Math.min(2, dt));
@@ -1379,7 +1431,8 @@ export default function Game() {
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: '#03010a', overflow: 'hidden' }}>
-      <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
+      {isLoading && <Loader progress={loadingProgress} />}
+      <canvas ref={canvasRef} style={{ display: isLoading ? 'none' : 'block', width: '100%', height: '100%' }} />
     </div>
   );
 }
