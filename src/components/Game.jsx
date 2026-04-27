@@ -36,6 +36,7 @@ export default function Game() {
   const bonusAudio = useRef(new Audio('/sounds/bonus.mp3'));
   const yayAudio = useRef(new Audio('/sounds/yay.mp3'));
   const lightningAudio = useRef(new Audio('/sounds/lightning.mp3'));
+  const shockAudio = useRef(new Audio('/sounds/shock.mp3'));
 
   useEffect(() => {
     const productList = ['iphone', 'fridge', 'washing_machine', 'ac', 'laptop', 'microwave', 'tv', 'headphone', 'viccum_cleaner', 'watch', 'blender'];
@@ -57,6 +58,7 @@ export default function Game() {
       { ref: bonusAudio, src: '/sounds/bonus.mp3', vol: 0.7 },
       { ref: yayAudio, src: '/sounds/yay.mp3', vol: 0.8 },
       { ref: lightningAudio, src: '/sounds/lightning.mp3', vol: 0.6 },
+      { ref: shockAudio, src: '/sounds/shock.mp3', vol: 0.9 },
     ];
 
     const totalToLoad = imageAssets.length + productList.length + 14 + audioAssetsList.length;
@@ -190,6 +192,7 @@ export default function Game() {
     let scrollFar = 0, scrollMid = 0, scrollNear = 0, scrollFore = 0;
     let animId;
     let introTimer = 0; // 0 to 30s
+    let shockTimer = 0; // for the shocked animation
 
     // ── Generate buildings ────────────────────────────────────────────────
     function genBuildings(count, totalW, minH, maxH, minWid, maxWid) {
@@ -484,9 +487,9 @@ export default function Game() {
     }
 
     // ── DRAW: Ground (cyberpunk) ──────────────────────────────────────────
-    // ── DRAW: Ground (with Gaps) ──────────────────────────────────────────
+    // ── DRAW: Ground (with Gaps & Electric Traps) ─────────────────────────
     function drawGround() {
-      groundSegments.forEach(g => {
+      groundSegments.forEach((g, idx) => {
         const gx = g.x;
         const gw = g.w;
 
@@ -536,7 +539,51 @@ export default function Game() {
           }
           ctx.restore();
         }
+
+        // ── Gap Traps (Electric Fields) ──
+        ctx.fillStyle = NEON_PRP;
+        ctx.fillRect(gx, GROUND_Y, 2, 80); // Left containment wall
+        ctx.fillRect(gx + gw - 2, GROUND_Y, 2, 80); // Right containment wall
+
+        // If there's a gap after this segment, fill it with electricity
+        if (idx < groundSegments.length - 1) {
+          const gapX = gx + gw;
+          const nextX = groundSegments[idx + 1].x;
+          const gapW = nextX - gapX;
+          drawGapElectricity(gapX, gapW);
+        }
       });
+    }
+
+    function drawGapElectricity(x, w) {
+      if (x + w < 0 || x > W) return;
+      
+      const beamCount = 3;
+      ctx.save();
+      for (let i = 0; i < beamCount; i++) {
+        if (Math.random() > 0.6) continue;
+        
+        ctx.beginPath();
+        ctx.strokeStyle = i % 2 === 0 ? '#00f2ff' : NEON_PRP;
+        ctx.lineWidth = 1.5 + Math.random() * 2;
+        ctx.globalAlpha = 0.4 + Math.random() * 0.4;
+        
+        const y = GROUND_Y + 20 + i * 20;
+        ctx.moveTo(x, y);
+        
+        // Jagged electricity steps
+        const steps = 6;
+        for (let s = 1; s <= steps; s++) {
+          const sx = x + (w / steps) * s;
+          const sy = y + (Math.random() - 0.5) * 15;
+          ctx.lineTo(sx, sy);
+        }
+        
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = ctx.strokeStyle;
+        ctx.stroke();
+      }
+      ctx.restore();
     }
 
     function drawBillboards(list, scroll, totalW, alpha = 1) {
@@ -717,11 +764,32 @@ export default function Game() {
       const drawH = CHAR_SIZE;
 
       ctx.save();
-      ctx.translate(CHAR_X, charY + 15);
+      
+      // Jitter for shock effect
+      let jitterX = 0, jitterY = 0;
+      if (state === 'shocked') {
+        jitterX = (Math.random() - 0.5) * 12;
+        jitterY = (Math.random() - 0.5) * 12;
+        // Draw some lightning sparks around the character
+        if (Math.random() > 0.4) {
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(-20, -20); ctx.lineTo(20, 20); ctx.stroke();
+        }
+      }
+
+      ctx.translate(CHAR_X + jitterX, charY + 15 + jitterY);
       if (state === 'running' && !onGround) ctx.rotate(velY * 0.025);
+      
+      // If shocked, we use a single frame of the running sheet
+      const currentSheet = sheet;
+      const currentCols = cols;
+      const currentFrame = state === 'shocked' ? 0 : frameIndex;
+
       ctx.drawImage(
-        sheet,
-        col * fw, row * fh, fw, fh,
+        currentSheet,
+        (currentFrame % currentCols) * fw, Math.floor(currentFrame / currentCols) * fh, fw, fh,
         -drawW / 2, -drawH / 2, drawW, drawH
       );
       ctx.restore();
@@ -1099,7 +1167,7 @@ export default function Game() {
       lastMilestone = 0; milestoneTimer = 0;
       particles = []; floaters = []; jumpTrail = []; state = 'running';
       setGameStatus('running');
-      introTimer = 0;
+      introTimer = 0; shockTimer = 0;
       bgAudio.current.currentTime = 0;
       bgAudio.current.play().catch(() => {});
     }
@@ -1108,6 +1176,16 @@ export default function Game() {
     function update(dtScale) {
       frameCount += dtScale; // Always increment for animations (like wave)
       
+      if (state === 'shocked') {
+        shockTimer -= dtScale;
+        if (shockTimer <= 0) {
+          state = 'dead';
+          setGameStatus('dead');
+          if (score > bestScore) bestScore = score;
+        }
+        return; // Stop everything else
+      }
+
       if (state !== 'running') return;
       score += 0.1 * dtScale;
       introTimer += dtScale;
@@ -1156,8 +1234,21 @@ export default function Game() {
 
       if (!stood) onGround = false;
 
-      // Death check (Falling off)
-      if (charY > H + 100) {
+      // Death check (Falling off or hitting electricity)
+      if (charY > GROUND_Y + 15 && !onGround && state === 'running') {
+        state = 'shocked';
+        setGameStatus('shocked');
+        shockTimer = 80;
+        bgAudio.current.pause();
+        shockAudio.current.currentTime = 0;
+        shockAudio.current.play().catch(() => {});
+        // Haptic feedback
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+        // Stop vertical momentum to stay in the gap
+        velY = 0;
+      }
+      
+      if (charY > H + 200) {
         state = 'dead';
         setGameStatus('dead');
         bgAudio.current.pause();
@@ -1194,14 +1285,17 @@ export default function Game() {
         platforms.push({ x: px, y: py, w: pw });
         
         // Spawn items on the platform
+        // Spawn items on the platform in a straight line
         if (Math.random() > 0.4) {
           const coinCount = 3 + Math.floor(Math.random() * 3);
+          const pxStart = px - pw/2 + 20;
           for (let i = 0; i < coinCount; i++) {
+            const isSpecial = Math.random() > 0.9;
             coins.push({ 
-              x: px - pw/2 + (i + 0.5) * (pw / coinCount), 
-              y: py - 40, 
+              x: pxStart + i * (pw / coinCount), 
+              y: isSpecial ? py - 140 : py - 40, 
               collected: false,
-              special: Math.random() > 0.85
+              special: isSpecial
             });
           }
         }
@@ -1229,14 +1323,17 @@ export default function Game() {
         groundSegments.push({ x: gx, w: gw });
         
         // Spawn coins on ground
-        if (Math.random() > 0.6) { // Lower frequency
-          const coinCount = 3 + Math.floor(Math.random() * 3);
+        // Spawn coins on ground in a straight line
+        if (Math.random() > 0.5) {
+          const coinCount = 5 + Math.floor(Math.random() * 3);
+          const gxStart = gx + 20;
           for (let i = 0; i < coinCount; i++) {
+            const isSpecial = Math.random() > 0.9;
             coins.push({ 
-              x: gx + (i + 0.5) * (gw / coinCount), 
-              y: GROUND_Y - 40, 
+              x: gxStart + i * 60, 
+              y: isSpecial ? GROUND_Y - 140 : GROUND_Y - 40, 
               collected: false,
-              special: Math.random() > 0.85
+              special: isSpecial
             });
           }
         }
@@ -1245,7 +1342,7 @@ export default function Game() {
       }
 
       groundSegments.forEach(g => g.x -= move);
-      groundSegments = groundSegments.filter(g => g.x > -g.w);
+      groundSegments = groundSegments.filter(g => g.x + g.w > -400);
 
       platforms.forEach(p => p.x -= move);
       platforms = platforms.filter(p => p.x > -p.w);
@@ -1260,14 +1357,24 @@ export default function Game() {
       });
       obstacles = obstacles.filter(o => o.x > -100);
 
-      if (Math.random() < 0.008 * dtScale && nextObstacleIn > 120) {
-        const count = 3 + Math.floor(Math.random() * 4);
+      if (Math.random() < 0.009 * dtScale && nextObstacleIn > 120) {
+        const count = 5 + Math.floor(Math.random() * 3);
         const startX = W + 300;
-        const groundType = Math.random() > 0.5;
+        
+        // Choose a baseline height (Ground or Platform level)
+        const onPlatform = Math.random() > 0.5;
+        const baseLine = onPlatform ? GROUND_Y - 140 : GROUND_Y;
         const safe = !obstacles.some(o => Math.abs(o.x - startX) < 150);
+        
         if (safe) {
           for (let i = 0; i < count; i++) {
-            coins.push({ x: startX + i * 40, y: groundType ? GROUND_Y - 30 : GROUND_Y - 120, collected: false });
+            const isSpecial = Math.random() > 0.9;
+            coins.push({ 
+              x: startX + i * 50, 
+              y: isSpecial ? baseLine - 140 : baseLine - 40, 
+              collected: false,
+              special: isSpecial
+            });
           }
         }
       }
