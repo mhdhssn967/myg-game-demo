@@ -8,6 +8,7 @@ const StartScreen = ({ onStart }) => {
         {/* Top Glow Line */}
         <div style={styles.topGlow}></div>
         
+
         {/* Logo Header Section */}
         <div style={styles.header}>
           <img 
@@ -79,9 +80,9 @@ const StartScreen = ({ onStart }) => {
               
               if (requestFS) {
                 requestFS.call(docEl).then(() => {
-                  // Attempt to lock orientation on mobile
+                  // Attempt to lock orientation on mobile to PORTRAIT
                   if (window.screen.orientation && window.screen.orientation.lock) {
-                    window.screen.orientation.lock('landscape').catch(() => {});
+                    window.screen.orientation.lock('portrait').catch(() => {});
                   }
                 }).catch(() => {});
               }
@@ -100,7 +101,10 @@ const StartScreen = ({ onStart }) => {
           </svg>
         </button>
 
-       
+        {/* Footer info */}
+        <div style={styles.footer}>
+           BEST EXPERIENCED IN PORTRAIT
+        </div>
       </div>
 
       <style>{`
