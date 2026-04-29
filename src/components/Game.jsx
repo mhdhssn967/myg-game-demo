@@ -73,7 +73,7 @@ export default function Game() {
       { ref: explosionAudio, src: '/sounds/explosion.mp3', vol: 0.9 },
     ];
 
-    const totalToLoad = imageAssets.length + productList.length + 14 + audioAssetsList.length;
+    const totalToLoad = imageAssets.length + productList.length + 5 + audioAssetsList.length;
     let loadedCount = 0;
 
     const incrementProgress = () => {
@@ -141,24 +141,20 @@ export default function Game() {
     }, 6);
 
     // Load billboards in batches
-    const bbIndices = Array.from({length: 14}, (_, i) => i + 1);
+    const bbIndices = Array.from({length: 5}, (_, i) => i + 1);
     loadBatch(bbIndices, (i) => {
       return new Promise((resolve) => {
         const img = new Image();
-        const fallbackExt = (i === 13 || i === 14) ? 'jpg' : 'png';
         billboardImages.current.push(img);
         img.onload = () => { incrementProgress(); resolve(); };
         img.onerror = () => {
-          if (img.src.endsWith('.webp')) {
-            img.src = `/images/billboards/story${i}.${fallbackExt}`;
-          } else {
-            incrementProgress();
-            resolve();
-          }
+          console.error(`Failed to load billboard: /images/billboards/board${i}.jpeg`);
+          incrementProgress();
+          resolve();
         };
-        img.src = `/images/billboards/story${i}.webp`;
+        img.src = `/images/billboards/board${i}.jpeg`;
       });
-    }, 6);
+    }, 5);
 
     // Load audio
     audioAssetsList.forEach(asset => {
@@ -264,7 +260,7 @@ export default function Game() {
     let magnets = [];
     
     // ── Boss/Hazard: Spaceship ──
-    let ship = { active: false, x: 0, y: 0, state: 'idle', timer: 0, shootTimer: 0, shotsLeft: 0, cooldown: 0 };
+    let ship = { active: false, x: 0, y: 0, baseY: 0, state: 'idle', timer: 0, shootTimer: 0, shotsLeft: 0, cooldown: 0 };
     let rocket = { active: false, x: 0, y: 0, startX: 0, startY: 0, targetX: 0, targetY: 0, t: 0, rot: 0 };
     let lastShipMilestone = 0;
 
@@ -419,7 +415,7 @@ export default function Game() {
         y: minY + Math.random() * (maxY - minY),
         w: 180 + Math.random() * 260, // Clearer poster size
         h: 120 + Math.random() * 160,
-        adIndex: Math.floor(Math.random() * 14),
+        adIndex: Math.floor(Math.random() * 5),
         floatOff: Math.random() * Math.PI * 2,
         flicker: Math.random(),
         glowColor: Math.random() > 0.5 ? NEON_ORG : NEON_PRP
@@ -438,8 +434,8 @@ export default function Game() {
     const bldNear  = genBuildings(8, WORLD_W * 2,   H * 0.15, H * 0.38, 80, 180);
 
     // Billboards
-    const adsMid  = genBillboards(8, WORLD_W * 2.5, H * 0.2, H * 0.5);
-    const adsNear = genBillboards(6, WORLD_W * 2,   H * 0.1, H * 0.4);
+    const adsMid  = genBillboards(8, WORLD_W * 2.5, H * 0.05, H * 0.22);
+    const adsNear = genBillboards(6, WORLD_W * 2,   H * 0.08, H * 0.28);
 
     // Initial size setup and background bitmap generation
     updateSize();
@@ -761,13 +757,13 @@ export default function Game() {
     // ── DRAW: Electrifying Brand Intro ───────────────────────────────────
     function drawBrandIntro() {
       const elapsed = introTimer / 60; // seconds
-      if (elapsed > 30) return;
+      if (elapsed > 6) return;
 
-      const alpha = elapsed > 28 ? (30 - elapsed) / 2 : 1;
+      const alpha = elapsed > 4.5 ? (6 - elapsed) / 1.5 : 1;
       ctx.save();
       ctx.globalAlpha = alpha;
 
-      const segmentDuration = 3;
+      const segmentDuration = 2;
       const segmentIndex = Math.floor(elapsed / segmentDuration);
       const segmentTime = elapsed % segmentDuration;
       
@@ -796,20 +792,13 @@ export default function Game() {
 
       // ── Text Sequence ──
       const texts = [
-        { t: 0, d: 3, txt: "myG", sub: "Since 2006", logo: true },
-        { t: 3, d: 3, txt: "THE DIGITAL HUB", sub: "Kerala's No.1 Destination" },
-        { t: 6, d: 3, txt: "150+ SHOWROOMS", sub: "Driven by 1 Vision" },
-        { t: 9, d: 3, txt: "SOMETHING EPIC", sub: "Is Coming..." },
-        { t: 12, d: 3, txt: "myG EPIC", sub: "The Future of Experience" },
-        { t: 15, d: 3, txt: "FROM FUTURE...", sub: "Standardizing Retail" },
-        { t: 18, d: 3, txt: "TO THE EPIC", sub: "Experience Zones" },
-        { t: 21, d: 3, txt: "HIGH-TECH", sub: "World-Class Tech Hub" },
-        { t: 24, d: 3, txt: "NEXT GEN", sub: "Redefining Journey" },
-        { t: 27, d: 3, txt: "myG EPIC", sub: "Extraordinary" }
+        { t: 0, d: 2, txt: "myG", sub: "Since 2006", logo: true },
+        { t: 2, d: 2, txt: "THE DIGITAL HUB", sub: "Kerala's No.1 Destination" },
+        { t: 4, d: 2, txt: "150+ SHOWROOMS", sub: "Driven by 1 Vision" }
       ];
 
       const current = texts[segmentIndex];
-      if (current && elapsed < 30) {
+      if (current && elapsed < 6) {
         ctx.textAlign = 'center';
         
         
@@ -1569,7 +1558,7 @@ export default function Game() {
       // Spawn Ground Segments (Gaps)
       nextGroundIn -= dtScale;
       if (nextGroundIn <= 0) {
-        const isIntro = (introTimer / 60) <= 30;
+        const isIntro = (introTimer / 60) <= 6;
         const gw = isIntro ? 1200 : (600 + Math.random() * 800);
         const gap = isIntro ? -10 : (120 + Math.random() * 220); // Overlap by 10px in intro to ensure no gaps
         const gx = W + gap;
@@ -1672,14 +1661,15 @@ export default function Game() {
 
       if (milestoneTimer > 0) milestoneTimer -= dtScale;
 
-      // ── Boss Logic: Spaceship (Trigger: Multiples of 500) ──
-      const shipMilestone = Math.floor(score / 500);
+      // ── Boss Logic: Spaceship (Trigger: Multiples of 1000) ──
+      const shipMilestone = Math.floor(score / 1000);
       if (shipMilestone > lastShipMilestone && !ship.active && state === 'running') {
         lastShipMilestone = shipMilestone;
         ship.active = true;
         ship.state = 'entering';
         ship.x = W + 200;
-        ship.y = H * 0.65;
+        ship.baseY = H * 0.2 + Math.random() * (H * 0.7);
+        ship.y = ship.baseY;
         ship.timer = 0;
         ship.shootTimer = 0;
         ship.shotsLeft = 3;
@@ -1688,14 +1678,14 @@ export default function Game() {
       if (ship.active) {
         if (ship.state === 'entering') {
           ship.x -= 4 * dtScale;
-          ship.y = H * 0.65 + Math.sin(frameCount * 0.05) * 50;
+          ship.y = ship.baseY + Math.sin(frameCount * 0.05) * 50;
           if (ship.x <= W * 0.95) {
             ship.state = 'aiming';
             ship.shootTimer = 180; // 3 seconds for first shot
           }
         } else if (ship.state === 'aiming') {
           ship.x = W * 0.95 + Math.sin(frameCount * 0.03) * 20;
-          ship.y = H * 0.65 + Math.cos(frameCount * 0.05) * 40;
+          ship.y = ship.baseY + Math.cos(frameCount * 0.05) * 40;
           ship.shootTimer -= dtScale;
           if (ship.shootTimer <= 0) {
             ship.state = 'firing';
@@ -1797,15 +1787,16 @@ export default function Game() {
       drawCachedLayer(bgCanvases.ghost, scrollFar * 0.15, WORLD_W * 3.5);
       drawCachedLayer(bgCanvases.far,   scrollFar * 0.3,  WORLD_W * 3);
       
-      const isIntro = (introTimer / 60) <= 30;
-      if (!isIntro && !isLowEnd) {
-        drawBillboards(adsMid, scrollMid * 0.6, WORLD_W * 2.5, 0.5);
+      const isIntro = (introTimer / 60) <= 6;
+      if (!isLowEnd) {
         drawCachedLayer(bgCanvases.mid, scrollMid * 0.6,  WORLD_W * 2.5);
-        drawBillboards(adsNear, scrollNear, WORLD_W * 2, 0.85);
+        if (!isIntro) drawBillboards(adsMid, scrollMid * 0.6, WORLD_W * 2.5, 0.7);
+        
         drawCachedLayer(bgCanvases.near, scrollNear,        WORLD_W * 2);
+        if (!isIntro) drawBillboards(adsNear, scrollNear, WORLD_W * 2, 1.0);
       }
 
-      if (state === 'running' && introTimer / 60 <= 30) drawBrandIntro();
+      if (state === 'running' && introTimer / 60 <= 6) drawBrandIntro();
 
       // ── Ground & street ──
       drawStreetLights();
