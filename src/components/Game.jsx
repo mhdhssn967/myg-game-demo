@@ -434,8 +434,8 @@ export default function Game() {
     const bldNear  = genBuildings(8, WORLD_W * 2,   H * 0.15, H * 0.38, 80, 180);
 
     // Billboards
-    const adsMid  = genBillboards(8, WORLD_W * 2.5, H * 0.45, H * 0.62);
-    const adsNear = genBillboards(6, WORLD_W * 2,   H * 0.48, H * 0.68);
+    const adsMid  = genBillboards(8, WORLD_W * 2.5, H * 0.85, H * 0.92);
+    const adsNear = genBillboards(6, WORLD_W * 2,   H * 0.88, H * 0.98);
 
     // Initial size setup and background bitmap generation
     updateSize();
@@ -792,9 +792,9 @@ export default function Game() {
 
       // ── Text Sequence ──
       const texts = [
-        { t: 0, d: 2, txt: "WELCOME TO myG", sub: "Empowering your digital life since 2006", logo: true },
-        { t: 2, d: 2, txt: "THE DIGITAL HUB", sub: "Kerala's No.1 destination for world-class gadgets" },
-        { t: 4, d: 2, txt: "150+ SHOWROOMS", sub: "One vision, connecting millions across the nation" }
+        { t: 0, d: 2, txt: "WELCOME TO myG", sub: "Empowering lives since 2006", logo: true },
+        { t: 2, d: 2, txt: "THE DIGITAL HUB", sub: "Kerala's No.1 tech destination" },
+        { t: 4, d: 2, txt: "150+ SHOWROOMS", sub: "One vision, connecting millions" }
       ];
 
       const current = texts[segmentIndex];
@@ -810,8 +810,8 @@ export default function Game() {
         const jitterX = (Math.random() - 0.5) * 5 * (segmentTime < 0.2 ? 15 : 0);
         
         // Scale text for mobile
-        const mainSize = Math.min(60, W * 0.1);
-        const subSize = Math.min(24, W * 0.05);
+        const mainSize = Math.min(55, W * 0.09);
+        const subSize = Math.min(22, W * 0.045);
 
         // Main Text
         ctx.fillStyle = NEON_ORG;
@@ -821,13 +821,13 @@ export default function Game() {
           const lSize = Math.min(220, W * 0.4);
           ctx.drawImage(logoTransImg.current, W/2 - lSize/2 + jitterX, baseY - lSize/2 - 40, lSize, lSize);
         } else {
-          ctx.fillText(current.txt, W/2 + jitterX, baseY);
+          ctx.fillText(current.txt, W/2 + jitterX, baseY, W * 0.9);
         }
 
         // Subtext
         ctx.fillStyle = '#fff';
         ctx.font = `${subSize}px "Orbitron", sans-serif`;
-        ctx.fillText(current.sub, W/2 - jitterX, baseY + mainSize * 0.8 + 10);
+        ctx.fillText(current.sub, W/2 - jitterX, baseY + mainSize * 0.8 + 10, W * 0.95);
       }
 
       ctx.restore();
