@@ -422,6 +422,9 @@ export default function Game() {
       }));
     }
 
+    // Initial size setup to ensure correct W and H for generation
+    updateSize();
+
     // ── 4 parallax building layers ────────────────────────────────────────
     const WORLD_W = 2400;
     // Layer 1 — farthest ghost silhouettes
@@ -434,11 +437,11 @@ export default function Game() {
     const bldNear  = genBuildings(8, WORLD_W * 2,   H * 0.15, H * 0.38, 80, 180);
 
     // Billboards
+    // Moved significantly lower to sit near/behind the ground level
     const adsMid  = genBillboards(8, WORLD_W * 2.5, H * 0.85, H * 0.92);
     const adsNear = genBillboards(6, WORLD_W * 2,   H * 0.88, H * 0.98);
 
-    // Initial size setup and background bitmap generation
-    updateSize();
+    // Initial background bitmap generation (uses bld lists)
     initBackgroundBitmaps();
 
     // Street lights
