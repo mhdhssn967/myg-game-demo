@@ -437,9 +437,9 @@ export default function Game() {
     const bldNear  = genBuildings(8, WORLD_W * 2,   H * 0.15, H * 0.38, 80, 180);
 
     // Billboards
-    // Adjusted 25% up from previous street-level position
-    const adsMid  = genBillboards(8, WORLD_W * 2.5, H * 0.60, H * 0.67);
-    const adsNear = genBillboards(6, WORLD_W * 2,   H * 0.63, H * 0.73);
+    // Adjusted another 15% up to sit in the upper mid-background
+    const adsMid  = genBillboards(8, WORLD_W * 2.5, H * 0.45, H * 0.52);
+    const adsNear = genBillboards(6, WORLD_W * 2,   H * 0.48, H * 0.58);
 
     // Initial background bitmap generation (uses bld lists)
     initBackgroundBitmaps();
