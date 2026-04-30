@@ -1,13 +1,7 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import Game from './components/Game';
-import { loginAnonymously } from './firebase/config';
 
 export default function App() {
-  useEffect(() => {
-    loginAnonymously().catch(() => {
-      // Error is already logged in config.js
-    });
-  }, []);
 
   return (
     <div className="fixed inset-0 w-full h-full bg-[#030712] overflow-hidden select-none touch-none">
