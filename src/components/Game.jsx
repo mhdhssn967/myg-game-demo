@@ -193,7 +193,7 @@ export default function Game() {
     let GROUND_Y = H ? H - 120 : 0;
     let charY = GROUND_Y - CHAR_SIZE / 2;
 
-    const updateSize = () => {
+    const updateSize = (skipBitmaps = false) => {
       // Cap DPR at 2 to prevent memory crashes on iPhones (Section 5.2)
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = window.innerWidth * dpr;
@@ -211,8 +211,8 @@ export default function Game() {
         charY = GROUND_Y - CHAR_SIZE / 2;
       }
       
-      // Re-render cached backgrounds on resize
-      if (typeof initBackgroundBitmaps === 'function') initBackgroundBitmaps();
+      // Re-render cached backgrounds on resize (only if requested and ready)
+      if (!skipBitmaps && typeof initBackgroundBitmaps === 'function') initBackgroundBitmaps();
     };
     window.addEventListener('resize', updateSize);
 
@@ -423,7 +423,7 @@ export default function Game() {
     }
 
     // Initial size setup to ensure correct W and H for generation
-    updateSize();
+    updateSize(true);
 
     // ── 4 parallax building layers ────────────────────────────────────────
     const WORLD_W = 2400;
