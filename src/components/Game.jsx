@@ -230,7 +230,7 @@ export default function Game() {
     const SCORE_BG   = 'rgba(10, 5, 20, 0.92)';
 
     // ── Layout CONSTANTS ──────────────────────────────────────────────────
-    const CHAR_X = W * 0.10;
+    const CHAR_X = W * 0.18;
     const GRAVITY = 0.4;
     const JUMP_VEL = -11;
     const MAX_JUMPS = 2;
@@ -434,8 +434,8 @@ export default function Game() {
     const bldNear  = genBuildings(8, WORLD_W * 2,   H * 0.15, H * 0.38, 80, 180);
 
     // Billboards
-    const adsMid  = genBillboards(8, WORLD_W * 2.5, H * 0.05, H * 0.22);
-    const adsNear = genBillboards(6, WORLD_W * 2,   H * 0.08, H * 0.28);
+    const adsMid  = genBillboards(8, WORLD_W * 2.5, H * 0.45, H * 0.62);
+    const adsNear = genBillboards(6, WORLD_W * 2,   H * 0.48, H * 0.68);
 
     // Initial size setup and background bitmap generation
     updateSize();
@@ -792,9 +792,9 @@ export default function Game() {
 
       // ── Text Sequence ──
       const texts = [
-        { t: 0, d: 2, txt: "myG", sub: "Since 2006", logo: true },
-        { t: 2, d: 2, txt: "THE DIGITAL HUB", sub: "Kerala's No.1 Destination" },
-        { t: 4, d: 2, txt: "150+ SHOWROOMS", sub: "Driven by 1 Vision" }
+        { t: 0, d: 2, txt: "WELCOME TO myG", sub: "Empowering your digital life since 2006", logo: true },
+        { t: 2, d: 2, txt: "THE DIGITAL HUB", sub: "Kerala's No.1 destination for world-class gadgets" },
+        { t: 4, d: 2, txt: "150+ SHOWROOMS", sub: "One vision, connecting millions across the nation" }
       ];
 
       const current = texts[segmentIndex];
@@ -1558,9 +1558,9 @@ export default function Game() {
       // Spawn Ground Segments (Gaps)
       nextGroundIn -= dtScale;
       if (nextGroundIn <= 0) {
-        const isIntro = (introTimer / 60) <= 6;
-        const gw = isIntro ? 1200 : (600 + Math.random() * 800);
-        const gap = isIntro ? -10 : (120 + Math.random() * 220); // Overlap by 10px in intro to ensure no gaps
+        const isFreePlay = (introTimer / 60) <= 15;
+        const gw = isFreePlay ? 1200 : (600 + Math.random() * 800);
+        const gap = isFreePlay ? -10 : (120 + Math.random() * 220); // Overlap by 10px in free play to ensure no gaps
         const gx = W + gap;
         groundSegments.push({ x: gx, w: gw });
         
