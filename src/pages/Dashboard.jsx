@@ -26,15 +26,21 @@ const Dashboard = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return window.localStorage.getItem('myg_admin_authenticated') === 'true';
+    const localAuth = window.localStorage.getItem('myg_admin_authenticated') === 'true';
+    const isFirebaseAnonymous = auth.currentUser?.isAnonymous;
+    return localAuth && !isFirebaseAnonymous;
   });
 
   useEffect(() => {
     // Listen to direct Firebase Authentication changes
     const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) {
+      if (user && !user.isAnonymous) {
         window.localStorage.setItem('myg_admin_authenticated', 'true');
         setIsAuthenticated(true);
+      } else if (user && user.isAnonymous) {
+        // Force require login if the current active Firebase user is anonymous
+        window.localStorage.removeItem('myg_admin_authenticated');
+        setIsAuthenticated(false);
       }
     });
     return () => unsubscribe();
@@ -648,7 +654,7 @@ const Dashboard = () => {
           .dashboard-sidebar { transform: translateX(-100%); }
           .dashboard-sidebar.is-open { transform: translateX(0); }
           .sidebar-close { display: block; }
-          .dashboard-main { margin-left: 0; padding: 100px 20px 40px 20px; }
+          .dashboard-main { margin-left: 0; padding: 90px 16px 40px 16px; width: 100%; max-width: 100%; box-sizing: border-box; overflow-x: hidden; }
           .mobile-navbar {
             display: flex; position: fixed; top: 0; left: 0; right: 0; height: 70px; background: #0a0518;
             padding: 0 20px; align-items: center; justify-content: space-between; z-index: 100; border-bottom: 1px solid rgba(255,107,0,0.1);
@@ -659,72 +665,94 @@ const Dashboard = () => {
         }
 
         @media (max-width: 768px) {
-          .main-header { flex-direction: column; align-items: flex-start; gap: 20px; }
-          .header-utils { width: 100%; justify-content: space-between; }
-          .header-search { width: 100%; flex: 1; }
-          .section-header { flex-direction: column; align-items: flex-start; gap: 15px; }
-          .download-btn { width: 100%; justify-content: center; }
+          .main-header { flex-direction: column; align-items: flex-start; gap: 16px; margin-bottom: 28px; }
+          .main-title { font-size: 24px; }
+          .main-subtitle { font-size: 12px; }
+          .header-utils { width: 100%; justify-content: space-between; gap: 12px; }
+          .header-search { width: 100%; flex: 1; height: 40px; }
+          .util-btn { width: 40px; height: 40px; }
+          
+          .section-header { display: flex; flex-direction: row; justify-content: space-between; align-items: center; gap: 12px; width: 100%; }
+          .section-title { font-size: 14px; font-weight: 700; }
+          .download-btn { width: auto !important; justify-content: center; padding: 6px 10px; font-size: 11px; gap: 4px; border-radius: 8px; }
 
-          /* Stacked card table layout on mobile */
-          .data-table thead {
-            display: none;
+          /* Metrics three-cards in one row optimization on mobile */
+          .metrics-grid {
+            display: grid !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 8px !important;
+            margin-bottom: 20px;
           }
-          
-          .data-table, .data-table tbody {
-            display: block;
-            width: 100%;
+          .metric-card {
+            padding: 10px 8px !important;
+            border-radius: 12px !important;
           }
-          
-          .data-table tr {
-            display: grid;
-            grid-template-columns: auto 1fr;
-            grid-gap: 8px 16px;
-            padding: 20px;
-            margin-bottom: 16px;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 20px;
-            width: 100%;
-            box-sizing: border-box;
-          }
-          
-          .data-table td {
-            display: block;
-            border: none;
-            padding: 0 !important;
-            font-size: 13px;
-          }
-          
-          /* Rank Badge column spans both rows vertically */
-          .data-table td:nth-child(1) {
-            grid-row: 1 / 7;
-            align-self: center;
-          }
-          
-          /* Name cell occupies top row */
-          .data-table td.name-cell {
-            font-size: 16px;
-            font-weight: 700;
-            color: #fff;
-            grid-column: 2;
-          }
-          
-          /* Add pseudo labels on mobile for columns 3 to 7 */
-          .data-table td.age-cell::before { content: "Age: "; color: rgba(255,255,255,0.4); font-weight: 600; }
-          .data-table td.phone-cell::before { content: "Phone: "; color: rgba(255,255,255,0.4); font-weight: 600; }
-          .data-table td.score-cell::before { content: "Peak Coins: "; color: rgba(255,255,255,0.4); font-weight: 600; }
-          .data-table td.total-coins-cell::before { content: "Total Coins: "; color: rgba(255,255,255,0.4); font-weight: 600; }
-          .data-table td.played-at-cell::before { content: "Played At: "; color: rgba(255,255,255,0.4); font-weight: 600; }
-          
-          .data-table td.age-cell,
-          .data-table td.phone-cell,
-          .data-table td.score-cell,
-          .data-table td.total-coins-cell,
-          .data-table td.played-at-cell {
-            grid-column: 2;
+          .card-top {
+            margin-bottom: 8px !important;
             display: flex;
-            gap: 4px;
+            justify-content: flex-start;
           }
+          .card-icon-box {
+            width: 28px !important;
+            height: 28px !important;
+            border-radius: 8px !important;
+          }
+          .card-icon-box svg {
+            width: 14px !important;
+            height: 14px !important;
+          }
+          .card-badge {
+            display: none !important; /* Hide badge on mobile to save space */
+          }
+          .card-label {
+            font-size: 9px !important;
+            color: rgba(255,255,255,0.4);
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+          }
+          .card-value {
+            font-size: 13px !important;
+            font-weight: 800;
+            margin-top: 2px !important;
+          }
+          
+          /* Data section spacing */
+          .data-section { padding: 12px; border-radius: 16px; width: 100%; max-width: 100%; box-sizing: border-box; }
+
+          /* Horizontal table scrolling on mobile */
+          .table-container {
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch;
+            width: 100% !important;
+            max-width: 100% !important;
+            display: block !important;
+            margin-top: 10px;
+          }
+          
+          .data-table {
+            min-width: 850px !important; /* Keep full table structural sizing scrollable horizontally */
+            width: 100% !important;
+          }
+          
+          .data-table th, .data-table td {
+            padding: 12px 8px !important;
+            font-size: 12px !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .dashboard-main { padding: 85px 12px 30px 12px; }
+          .main-header { gap: 12px; }
+          .header-utils { gap: 8px; }
+          .header-search { height: 38px; }
+          .util-btn { width: 38px; height: 38px; }
+          
+          /* Login Card responsive scaling */
+          .login-box { padding: 24px 16px; border-radius: 20px; }
+          .login-title { font-size: 20px; }
+          .login-subtitle { font-size: 11px; }
+          .login-logo { height: 32px; margin-bottom: 12px; }
+          .login-hint { padding-top: 12px; margin-top: 16px; }
         }
       `}</style>
     </div>

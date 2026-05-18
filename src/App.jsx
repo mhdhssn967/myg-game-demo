@@ -2,9 +2,32 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Game from './components/Game';
 import Dashboard from './pages/Dashboard';
-import { loginAnonymously } from './firebase/config';
+import { auth, loginAnonymously } from './firebase/config';
 
 function GamePage() {
+  useEffect(() => {
+    const checkAndEnsureAnonymous = async () => {
+      const user = auth.currentUser;
+      if (user && !user.isAnonymous) {
+        console.log("Admin email/password user detected on game root page. Switching to anonymous credentials...");
+        try {
+          await auth.signOut();
+          await loginAnonymously();
+        } catch (err) {
+          console.error("Failed to switch to anonymous credentials:", err);
+        }
+      } else if (!user) {
+        // Guarantee player has anonymous credentials on game startup
+        try {
+          await loginAnonymously();
+        } catch (err) {
+          console.error("Failed to initialize anonymous player session:", err);
+        }
+      }
+    };
+    checkAndEnsureAnonymous();
+  }, []);
+
   return (
     <div className="fixed inset-0 w-full h-full bg-[#030712] overflow-hidden select-none touch-none">
       <Game />
@@ -34,10 +57,6 @@ function GamePage() {
 }
 
 export default function App() {
-  useEffect(() => {
-    loginAnonymously().catch(() => {});
-  }, []);
-
   return (
     <Router>
       <Routes>
