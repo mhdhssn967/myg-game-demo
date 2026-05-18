@@ -1,13 +1,13 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Game from './components/Game';
+import Dashboard from './pages/Dashboard';
+import { loginAnonymously } from './firebase/config';
 
-export default function App() {
-
+function GamePage() {
   return (
     <div className="fixed inset-0 w-full h-full bg-[#030712] overflow-hidden select-none touch-none">
-      {/* 2D High Performance Runner */}
       <Game />
-
       <style>
         {`
           @import url('https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap');
@@ -30,6 +30,26 @@ export default function App() {
         `}
       </style>
     </div>
+  );
+}
+
+export default function App() {
+  useEffect(() => {
+    loginAnonymously().catch(() => {});
+  }, []);
+
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<GamePage />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+      </Routes>
+      <style>
+        {`
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        `}
+      </style>
+    </Router>
   );
 }
 

@@ -20,6 +20,10 @@ const db = getFirestore(app);
 // Function for anonymous login
 export const loginAnonymously = async () => {
   try {
+    if (auth.currentUser) {
+      console.log("Already logged in anonymously:", auth.currentUser.uid);
+      return auth.currentUser;
+    }
     const userCredential = await signInAnonymously(auth);
     console.log("Logged in anonymously:", userCredential.user.uid);
     return userCredential.user;

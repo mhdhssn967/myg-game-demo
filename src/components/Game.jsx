@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Loader from './Loader';
 import StartScreen from './UI/StartScreen';
+import { db, loginAnonymously } from '../firebase/config';
+import { doc, setDoc, serverTimestamp, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import runSprite from '../assets/run.png';
 import waveSprite from '../assets/wave.png';
 
@@ -8,6 +10,15 @@ export default function Game() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [gameStatus, setGameStatus] = useState('idle');
+  const [profile, setProfile] = useState(null);
+  const [showProfilePrompt, setShowProfilePrompt] = useState(false);
+  const [profileStep, setProfileStep] = useState('phone');
+  const [tempPhone, setTempPhone] = useState('');
+  const [tempName, setTempName] = useState('');
+  const [tempAge, setTempAge] = useState('');
+  const [profileError, setProfileError] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [lastSubmitMsg, setLastSubmitMsg] = useState('');
   const startTriggerRef = useRef(null);
   const canvasRef = useRef(null);
   const spriteSheet = useRef(new Image());
@@ -17,6 +28,11 @@ export default function Game() {
   useEffect(() => {
     isLoadingRef.current = isLoading;
   }, [isLoading]);
+  
+  const profileRef = useRef(null);
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
   
   const logoImg = useRef(new Image());
   const logoTransImg = useRef(new Image());
@@ -45,7 +61,50 @@ export default function Game() {
   const missileAudio = useRef(new Audio('/sounds/missile.mp3'));
   const explosionAudio = useRef(new Audio('/sounds/explosion.mp3'));
 
+  // Auto-sync player profile from Firestore on startup
   useEffect(() => {
+    const storedProfile = window.localStorage.getItem('myg_user_profile');
+    if (storedProfile) {
+      try {
+        const parsed = JSON.parse(storedProfile);
+        if (parsed?.phone) {
+          (async () => {
+            try {
+              const userRef = doc(db, 'users', parsed.phone);
+              const docSnap = await getDoc(userRef);
+              if (docSnap.exists()) {
+                const data = docSnap.data();
+                const updatedProfile = {
+                  phone: parsed.phone,
+                  name: data.name || parsed.name || '',
+                  age: data.age ? Number(data.age) : (parsed.age ? Number(parsed.age) : ''),
+                };
+                // Update local storage and React state
+                window.localStorage.setItem('myg_user_profile', JSON.stringify(updatedProfile));
+                setProfile(updatedProfile);
+                console.log('Successfully synchronized profile from Firestore:', updatedProfile);
+              }
+            } catch (err) {
+              console.warn('Failed to auto-sync profile from Firestore on mount:', err);
+            }
+          })();
+        }
+      } catch (err) {
+        console.warn('Error parsing stored profile for sync:', err);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const storedProfile = window.localStorage.getItem('myg_user_profile');
+    if (storedProfile) {
+      try {
+        setProfile(JSON.parse(storedProfile));
+      } catch (err) {
+        console.warn('Unable to parse stored profile:', err);
+      }
+    }
+
     const productList = ['iphone', 'fridge', 'washing_machine', 'ac', 'laptop', 'microwave', 'tv', 'headphone', 'viccum_cleaner', 'watch', 'blender'];
     
     // Reset lists to avoid duplication on hot reload
@@ -1235,6 +1294,54 @@ export default function Game() {
       ctx.fillText(Math.floor(score), scoreW / 2, 36);
       ctx.restore();
 
+      // Player name display - top center
+      let displayName = 'GUEST';
+      let currentProfile = profileRef.current;
+      if (!currentProfile?.phone) {
+        const stored = window.localStorage.getItem('myg_user_profile');
+        if (stored) {
+          try {
+            currentProfile = JSON.parse(stored);
+          } catch (e) {}
+        }
+      }
+      if (currentProfile?.name) {
+        displayName = currentProfile.name.toUpperCase();
+      }
+
+      ctx.save();
+      const nameFont = '14px "Luckiest Guy"';
+      ctx.font = nameFont;
+      const nameText = `${displayName}`;
+      const nameTextW = ctx.measureText(nameText).width;
+      const boxW = nameTextW + 30;
+      const boxH = 32;
+      const boxX = W / 2 - boxW / 2;
+      const boxY = 15;
+
+      // Draw container box
+      ctx.fillStyle = 'rgba(3,1,10,0.85)';
+      ctx.strokeStyle = NEON_ORG;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxW, boxH, 6);
+      ctx.fill();
+      ctx.stroke();
+
+      // Draw inner accent line
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(boxX + 2, boxY + 2, boxW - 4, boxH - 4, 4);
+      ctx.stroke();
+
+      // Draw text
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(nameText, W / 2, boxY + boxH / 2 + 1);
+      ctx.restore();
+
       // Coin display — top right
       ctx.save();
       const coinY = 38;
@@ -1318,6 +1425,27 @@ export default function Game() {
 
     function handleJump(clientX, clientY) {
       if (state === 'idle') {
+        // Prevent launching the game if profile is missing
+        let currentProfile = profileRef.current;
+        if (!currentProfile?.phone) {
+          const stored = window.localStorage.getItem('myg_user_profile');
+          if (stored) {
+            try {
+              currentProfile = JSON.parse(stored);
+            } catch (e) {
+              console.warn(e);
+            }
+          }
+        }
+
+        if (!currentProfile?.phone) {
+          // Trigger profile prompt UI and abort starting game!
+          setShowProfilePrompt(true);
+          setProfileStep('phone');
+          setProfileError('');
+          return;
+        }
+
         // Aggressive Fullscreen Request (Like an App)
         const docEl = document.documentElement;
         const requestFS = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
@@ -1426,6 +1554,7 @@ export default function Game() {
           state = 'dead';
           setGameStatus('dead');
           if (score > bestScore) bestScore = score;
+          submitScore(coinsCollected);
         }
         return; // Stop everything else
       }
@@ -1500,6 +1629,7 @@ export default function Game() {
         setGameStatus('dead');
         bgAudio.current.pause();
         if (score > bestScore) bestScore = score;
+        submitScore(coinsCollected);
       }
 
       /*
@@ -1608,6 +1738,7 @@ export default function Game() {
             setGameStatus('dead');
             bgAudio.current.pause();
             if (score > bestScore) bestScore = score;
+            submitScore(coinsCollected);
           }
         }
       });
@@ -1793,10 +1924,10 @@ export default function Game() {
       const isIntro = (introTimer / 60) <= 6;
       if (!isLowEnd) {
         drawCachedLayer(bgCanvases.mid, scrollMid * 0.6,  WORLD_W * 2.5);
-        if (!isIntro) drawBillboards(adsMid, scrollMid * 0.6, WORLD_W * 2.5, 0.7);
+        // if (!isIntro) drawBillboards(adsMid, scrollMid * 0.6, WORLD_W * 2.5, 0.7);
         
         drawCachedLayer(bgCanvases.near, scrollNear,        WORLD_W * 2);
-        if (!isIntro) drawBillboards(adsNear, scrollNear, WORLD_W * 2, 1.0);
+        // if (!isIntro) drawBillboards(adsNear, scrollNear, WORLD_W * 2, 1.0);
       }
 
       if (state === 'running' && introTimer / 60 <= 6) drawBrandIntro();
@@ -1919,13 +2050,351 @@ export default function Game() {
     };
   }, []);
 
+  const handleStartRequest = () => {
+    let currentProfile = profile;
+    if (!currentProfile?.phone) {
+      const stored = window.localStorage.getItem('myg_user_profile');
+      if (stored) {
+        try {
+          currentProfile = JSON.parse(stored);
+          setProfile(currentProfile);
+        } catch (e) {
+          console.warn('Failed to parse profile from localStorage in handleStartRequest:', e);
+        }
+      }
+    }
+
+    if (!currentProfile?.phone) {
+      setShowProfilePrompt(true);
+      setProfileStep('phone');
+      setProfileError('');
+      return;
+    }
+
+    startTriggerRef.current?.();
+  };
+
+  const resetProfileDialog = () => {
+    setProfileError('');
+    setTempName('');
+    setTempAge('');
+    setProfileStep('phone');
+  };
+
+  const onPhoneSubmit = async () => {
+    const phoneValue = tempPhone.trim();
+    if (!phoneValue) {
+      setProfileError('Please enter your phone number.');
+      return;
+    }
+    if (!/^[0-9+ ]{6,20}$/.test(phoneValue)) {
+      setProfileError('Phone number should contain digits, + and spaces only.');
+      return;
+    }
+
+    setProfileSaving(true);
+    setProfileError('');
+    try {
+      // Query Firestore to see if user is already registered
+      const userRef = doc(db, 'users', phoneValue);
+      const docSnap = await getDoc(userRef);
+
+      if (docSnap.exists()) {
+        // User already exists! Auto-fetch name and details
+        const data = docSnap.data();
+        const existingProfile = {
+          phone: phoneValue,
+          name: data.name || '',
+          age: data.age ? Number(data.age) : '',
+        };
+
+        // Persist locally
+        window.localStorage.setItem('myg_user_profile', JSON.stringify(existingProfile));
+        setProfile(existingProfile);
+
+        // Ensure logged in anonymously
+        await loginAnonymously().catch((e) => console.warn('Anonymous login inside onPhoneSubmit failed:', e));
+
+        // Start game immediately
+        setShowProfilePrompt(false);
+        resetProfileDialog();
+        startTriggerRef.current?.();
+      } else {
+        // User does not exist! Move to name and age entry step
+        setProfileStep('details');
+      }
+    } catch (err) {
+      console.error('Failed to verify user profile in Firestore:', err);
+      setProfileError('Failed to verify profile. Please check your internet connection and try again.');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const onProfileSubmit = async () => {
+    const name = tempName.trim();
+    const ageValue = tempAge.trim();
+    if (!name) {
+      setProfileError('Please enter your name.');
+      return;
+    }
+    if (!ageValue || isNaN(Number(ageValue)) || Number(ageValue) <= 0) {
+      setProfileError('Please enter a valid age.');
+      return;
+    }
+
+    const phoneValue = tempPhone.trim();
+    const profileData = {
+      phone: phoneValue,
+      phoneNumber: phoneValue, // support both fields for consistency
+      name,
+      age: Number(ageValue),
+      createdAt: serverTimestamp(),
+      totalScore: 0,
+      highscore: 0,
+    };
+
+    setProfileSaving(true);
+    setProfileError('');
+    try {
+      await setDoc(doc(db, 'users', phoneValue), profileData, { merge: true });
+      const savedProfile = { phone: phoneValue, name, age: Number(ageValue) };
+      window.localStorage.setItem('myg_user_profile', JSON.stringify(savedProfile));
+      setProfile(savedProfile);
+
+      // Ensure logged in anonymously
+      await loginAnonymously().catch((e) => console.warn('Anonymous login inside onProfileSubmit failed:', e));
+
+      setShowProfilePrompt(false);
+      resetProfileDialog();
+      startTriggerRef.current?.();
+    } catch (err) {
+      console.error('Failed to save profile:', err);
+      setProfileError('Unable to save your profile right now. Please try again.');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const submitScore = async (finalScore) => {
+    try {
+      let currentProfile = profileRef.current;
+      if (!currentProfile?.phone) {
+        const stored = window.localStorage.getItem('myg_user_profile');
+        if (stored) {
+          try {
+            currentProfile = JSON.parse(stored);
+          } catch (e) {
+            console.warn('Failed to parse profile from localStorage in submitScore:', e);
+          }
+        }
+      }
+
+      console.log('submitScore called with', finalScore, 'profileRef=', profileRef.current, 'localStorageProfile=', currentProfile);
+      if (!currentProfile?.phone) {
+        console.warn('No profile phone available; skipping submitScore');
+        return;
+      }
+      const phoneId = currentProfile.phone;
+
+      // Prepare the new score object with exactly 'score' and 'played at' keys
+      const newScoreEntry = {
+        score: Number(finalScore),
+        playedAt: new Date().toISOString() // double-entry to safeguard standard JS camelCase code
+      };
+
+      const userRef = doc(db, 'users', phoneId);
+
+      // Read current totals and update totalScore and highscore
+      const snap = await getDoc(userRef);
+      const data = snap.exists() ? snap.data() : {};
+      const prevTotal = Number(data.totalScore || 0);
+      const prevHigh = Number(data.highscore || 0);
+      const newTotal = prevTotal + Number(finalScore || 0);
+      const newHigh = Number(finalScore) > prevHigh ? Number(finalScore) : prevHigh;
+
+      // Update the primary user document: append to standard scores array, update totals, and record lastPlayedAt
+      await updateDoc(userRef, {
+        scores: arrayUnion(newScoreEntry),
+        totalScore: newTotal,
+        highscore: newHigh,
+        lastPlayedAt: newScoreEntry.playedAt
+      });
+
+      console.log('User totals and scores array updated', { newTotal, newHigh });
+      setLastSubmitMsg(`Score saved: ${finalScore}`);
+      setTimeout(() => setLastSubmitMsg(''), 4000);
+    } catch (e) {
+      console.error('Error submitting score:', e);
+      setLastSubmitMsg('Score submit failed');
+      setTimeout(() => setLastSubmitMsg(''), 4000);
+    }
+  };
+
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: '#03010a', overflow: 'hidden' }}>
       {isLoading && <Loader progress={loadingProgress} />}
       {!isLoading && gameStatus === 'idle' && (
-        <StartScreen onStart={() => startTriggerRef.current?.()} />
+        <StartScreen onStart={handleStartRequest} />
+      )}
+
+      {showProfilePrompt && (
+        <div style={profileStyles.overlay}>
+          <div style={profileStyles.box}>
+            <h2 style={profileStyles.heading}>Just one more step!</h2>
+            <p style={profileStyles.subtext}>
+              We use your phone number to let you know about rewards, special offers and game updates.
+            </p>
+
+            {profileStep === 'phone' ? (
+              <>
+                <label style={profileStyles.label}>
+                  Phone number
+                  <input
+                    autoFocus
+                    type="tel"
+                    value={tempPhone}
+                    onChange={(e) => setTempPhone(e.target.value)}
+                    style={profileStyles.input}
+                    placeholder="e.g. +91 98765 43210"
+                    disabled={profileSaving}
+                  />
+                </label>
+                <button onClick={onPhoneSubmit} style={profileStyles.button} disabled={profileSaving}>
+                  {profileSaving ? 'Checking...' : 'Continue'}
+                </button>
+              </>
+            ) : (
+              <>
+                <p style={profileStyles.confirmText}>Phone: <strong>{tempPhone}</strong></p>
+                <label style={profileStyles.label}>
+                  Your name
+                  <input
+                    type="text"
+                    value={tempName}
+                    onChange={(e) => setTempName(e.target.value)}
+                    style={profileStyles.input}
+                    placeholder="Enter your name"
+                    disabled={profileSaving}
+                  />
+                </label>
+                <label style={profileStyles.label}>
+                  Your age
+                  <input
+                    type="number"
+                    min="1"
+                    value={tempAge}
+                    onChange={(e) => setTempAge(e.target.value)}
+                    style={profileStyles.input}
+                    placeholder="Enter your age"
+                    disabled={profileSaving}
+                  />
+                </label>
+                <button onClick={onProfileSubmit} style={profileStyles.button} disabled={profileSaving}>
+                  {profileSaving ? 'Saving...' : 'Save Profile & Start'}
+                </button>
+              </>
+            )}
+
+            {profileError && <div style={profileStyles.error}>{profileError}</div>}
+            <button onClick={() => setShowProfilePrompt(false)} style={profileStyles.secondaryButton} disabled={profileSaving}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {lastSubmitMsg && (
+        <div style={{position:'absolute',left:20,top:20,zIndex:3000,background:'#0b1220',color:'#fff',padding:'8px 12px',borderRadius:10,border:'1px solid rgba(255,255,255,0.06)'}}>
+          {lastSubmitMsg}
+        </div>
       )}
       <canvas ref={canvasRef} style={{ display: isLoading ? 'none' : 'block', width: '100%', height: '100%' }} />
     </div>
   );
 }
+
+const profileStyles = {
+  overlay: {
+    position: 'absolute',
+    inset: 0,
+    zIndex: 2000,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'rgba(0, 0, 0, 0.9)',
+    padding: '20px',
+  },
+  box: {
+    width: '100%',
+    maxWidth: '420px',
+    borderRadius: '24px',
+    background: '#070a14',
+    border: '2px solid #ff6b00',
+    boxShadow: '0 0 40px rgba(255, 107, 0, 0.2)',
+    padding: '28px',
+    color: '#fff',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+  },
+  heading: {
+    margin: 0,
+    fontSize: '24px',
+    textAlign: 'center',
+    color: '#ffd06b',
+  },
+  subtext: {
+    margin: 0,
+    color: '#d1d5db',
+    lineHeight: 1.5,
+    textAlign: 'center',
+  },
+  label: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    fontSize: '14px',
+    color: '#f8fafc',
+  },
+  input: {
+    width: '100%',
+    padding: '12px 14px',
+    borderRadius: '14px',
+    border: '1px solid rgba(255, 255, 255, 0.12)',
+    background: '#111827',
+    color: '#fff',
+    fontSize: '16px',
+    outline: 'none',
+  },
+  button: {
+    width: '100%',
+    padding: '14px 16px',
+    borderRadius: '16px',
+    border: 'none',
+    background: '#ff6b00',
+    color: '#000',
+    fontWeight: 700,
+    fontSize: '16px',
+    cursor: 'pointer',
+  },
+  secondaryButton: {
+    width: '100%',
+    padding: '12px 16px',
+    borderRadius: '16px',
+    border: '1px solid rgba(255,255,255,0.2)',
+    background: 'transparent',
+    color: '#fff',
+    fontSize: '14px',
+    cursor: 'pointer',
+  },
+  error: {
+    color: '#ffb3b3',
+    fontSize: '14px',
+    textAlign: 'center',
+  },
+  confirmText: {
+    margin: 0,
+    color: '#f8fafc',
+    fontSize: '14px',
+  }
+};
