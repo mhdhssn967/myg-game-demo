@@ -108,45 +108,51 @@ const StartScreen = ({ onStart, profile }) => {
         {renderHearts()}
 
         {/* Start Button */}
-        <button 
-          onClick={(e) => {
-            e.stopPropagation();
-            
-            // Trigger Fullscreen
-            try {
-              const docEl = document.documentElement;
-              const requestFS = docEl.requestFullscreen || 
-                              docEl.webkitRequestFullscreen || 
-                              docEl.mozRequestFullScreen || 
-                              docEl.msRequestFullscreen;
+        {livesLeft === 0 ? (
+          <div style={styles.noLivesBanner}>
+            <span style={styles.noLivesText}>YOU HAVE NO LIVES LEFT</span>
+          </div>
+        ) : (
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
               
-              if (requestFS) {
-                requestFS.call(docEl).then(() => {
-                  // Attempt to lock orientation on mobile to PORTRAIT
-                  if (window.screen.orientation && window.screen.orientation.lock) {
-                    window.screen.orientation.lock('portrait').catch(() => {});
-                  }
-                }).catch(() => {
+              // Trigger Fullscreen
+              try {
+                const docEl = document.documentElement;
+                const requestFS = docEl.requestFullscreen || 
+                                docEl.webkitRequestFullscreen || 
+                                docEl.mozRequestFullScreen || 
+                                docEl.msRequestFullscreen;
+                
+                if (requestFS) {
+                  requestFS.call(docEl).then(() => {
+                    // Attempt to lock orientation on mobile to PORTRAIT
+                    if (window.screen.orientation && window.screen.orientation.lock) {
+                      window.screen.orientation.lock('portrait').catch(() => {});
+                    }
+                  }).catch(() => {
+                    document.body.style.cssText = 'position:fixed;inset:0;overflow:hidden;touch-action:none;';
+                  });
+                } else {
                   document.body.style.cssText = 'position:fixed;inset:0;overflow:hidden;touch-action:none;';
-                });
-              } else {
+                }
+              } catch (err) {
                 document.body.style.cssText = 'position:fixed;inset:0;overflow:hidden;touch-action:none;';
+                console.warn("Fullscreen request failed:", err);
               }
-            } catch (err) {
-              document.body.style.cssText = 'position:fixed;inset:0;overflow:hidden;touch-action:none;';
-              console.warn("Fullscreen request failed:", err);
-            }
 
-            onStart();
-          }}
-          style={styles.startButton}
-          className="start-button-interactive"
-        >
-          <span style={styles.buttonText}>CLICK HERE TO START</span>
-          <svg style={styles.buttonIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-          </svg>
-        </button>
+              onStart();
+            }}
+            style={styles.startButton}
+            className="start-button-interactive"
+          >
+            <span style={styles.buttonText}>CLICK HERE TO START</span>
+            <svg style={styles.buttonIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            </svg>
+          </button>
+        )}
 
         {/* View Leaderboard Button */}
         <button 
@@ -497,6 +503,26 @@ const styles = {
     display: 'flex',
     justifyContent: 'center',
     gap: '4px',
+  },
+  noLivesBanner: {
+    width: '100%',
+    padding: '16px 12px',
+    background: 'rgba(255, 107, 0, 0.08)',
+    border: '2.5px solid #ff6b00',
+    borderRadius: '18px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 5px 15px rgba(255, 107, 0, 0.15)',
+    boxSizing: 'border-box',
+    animation: 'start-logo-float 3s ease-in-out infinite',
+  },
+  noLivesText: {
+    color: '#ff6b00',
+    fontSize: 'min(4.5vw, 18px)',
+    letterSpacing: '0.1em',
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
   }
 };
 
