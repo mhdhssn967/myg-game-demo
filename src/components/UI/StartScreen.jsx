@@ -1,7 +1,46 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import waveSprite from '../../assets/wave.png';
 
-const StartScreen = ({ onStart }) => {
+const StartScreen = ({ onStart, profile }) => {
+  const navigate = useNavigate();
+
+  const livesLeft = profile?.livesLeft !== undefined ? profile.livesLeft : 3;
+
+  const renderHearts = () => {
+    const hearts = [];
+    const totalLives = 3;
+    const currentLives = Math.max(0, Math.min(livesLeft, totalLives));
+    
+    for (let i = 0; i < totalLives; i++) {
+      const isFull = i < currentLives;
+      hearts.push(
+        <svg 
+          key={i} 
+          width="28" 
+          height="28" 
+          viewBox="0 0 24 24" 
+          fill={isFull ? '#ff6b00' : 'none'} 
+          stroke="#ff6b00" 
+          strokeWidth="2.5"
+          style={{ 
+            filter: isFull ? 'drop-shadow(0 0 8px rgba(255, 107, 0, 0.6))' : 'none', 
+            transition: 'all 0.3s ease',
+            margin: '0 4px'
+          }}
+        >
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
+      );
+    }
+    return (
+      <div style={styles.livesContainer}>
+        <span style={styles.livesLabel}>LIVES LEFT</span>
+        <div style={styles.heartsRow}>{hearts}</div>
+      </div>
+    );
+  };
+
   return (
     <div style={styles.overlay}>
       <div style={styles.container}>
@@ -65,6 +104,9 @@ const StartScreen = ({ onStart }) => {
           </div>
         </div>
 
+        {/* Lives Left Hearts Display */}
+        {renderHearts()}
+
         {/* Start Button */}
         <button 
           onClick={(e) => {
@@ -106,6 +148,21 @@ const StartScreen = ({ onStart }) => {
           </svg>
         </button>
 
+        {/* View Leaderboard Button */}
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate('/leaderboard');
+          }}
+          style={styles.leaderboardButton}
+          className="leaderboard-button-interactive"
+        >
+          <span style={styles.leaderboardButtonText}>VIEW LEADERBOARD</span>
+          <svg style={styles.leaderboardButtonIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </button>
+
         {/* Footer info */}
         <div style={styles.footer}>
            BEST EXPERIENCED IN PORTRAIT
@@ -117,11 +174,24 @@ const StartScreen = ({ onStart }) => {
           transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease;
         }
         .start-button-interactive:hover {
-          transform: scale(1.05);
+          transform: scale(1.03);
           box-shadow: 0 0 30px rgba(255, 107, 0, 0.6);
         }
         .start-button-interactive:active {
-          transform: scale(0.95);
+          transform: scale(0.97);
+        }
+        .leaderboard-button-interactive {
+        font-weight: 100;
+
+          transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease, border-color 0.2s;
+        }
+        .leaderboard-button-interactive:hover {
+          transform: scale(1.03);
+          box-shadow: 0 0 30px rgba(155, 48, 255, 0.5);
+          border-color: #b366ff;
+        }
+        .leaderboard-button-interactive:active {
+          transform: scale(0.97);
         }
         @keyframes start-bounce-x {
           0%, 100% { transform: translateX(0); }
@@ -164,7 +234,7 @@ const StartScreen = ({ onStart }) => {
 
 const styles = {
   overlay: {
-    position: 'absolute',
+    position: 'fixed',
     top: 0,
     left: 0,
     right: 0,
@@ -173,11 +243,13 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'center',
-    background: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'flex-start',
+    overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch',
+    background: 'rgba(0, 0, 0, 0.82)',
     backdropFilter: 'blur(12px)',
     WebkitBackdropFilter: 'blur(12px)',
-    padding: '20px',
+    padding: '20px 10px',
     fontFamily: "'Luckiest Guy', system-ui, sans-serif",
     userSelect: 'none',
     boxSizing: 'border-box',
@@ -190,14 +262,14 @@ const styles = {
     gap: '24px',
     width: '100%',
     maxWidth: '400px',
-    padding: '40px 30px',
+    padding: '30px 20px',
     background: '#03010a',
     border: '2px solid #ff6b00',
     borderRadius: '32px',
     boxShadow: '0 0 100px rgba(255, 107, 0, 0.25)',
     animation: 'start-fade-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
-    overflow: 'hidden',
     boxSizing: 'border-box',
+    margin: '20px 0',
   },
   characterSection: {
     position: 'relative',
@@ -368,12 +440,63 @@ const styles = {
     height: '22px',
     animation: 'start-bounce-x 1s infinite',
   },
+  leaderboardButton: {
+    width: '100%',
+    marginTop: '4px',
+    padding: '12px 10px',
+    background: 'rgba(155, 48, 255, 0.08)',
+    color: '#b366ff',
+    border: '2.5px solid #9b30ff',
+    borderRadius: '18px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+    boxShadow: '0 5px 15px rgba(155, 48, 255, 0.15)',
+    fontFamily: 'inherit',
+    boxSizing: 'border-box',
+  },
+  leaderboardButtonText: {
+    fontSize: 'min(4vw, 16px)',
+    letterSpacing: '0.05em',
+    fontWeight: 'bold',
+  },
+  leaderboardButtonIcon: {
+    width: '20px',
+    height: '20px',
+  },
   footer: {
     color: 'rgba(255, 255, 255, 0.2)',
     fontSize: '8px',
     letterSpacing: '0.2em',
     fontFamily: 'system-ui, sans-serif',
     textTransform: 'uppercase',
+  },
+  livesContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '8px',
+    width: '100%',
+    background: 'rgba(255, 107, 0, 0.05)',
+    border: '1px dashed rgba(255, 107, 0, 0.4)',
+    borderRadius: '16px',
+    padding: '12px 0',
+    boxSizing: 'border-box',
+    marginTop: '6px',
+  },
+  livesLabel: {
+    color: '#ff6b00',
+    fontSize: '11px',
+    letterSpacing: '0.2em',
+    textTransform: 'uppercase',
+    fontWeight: 'bold',
+  },
+  heartsRow: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '4px',
   }
 };
 

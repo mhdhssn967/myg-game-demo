@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Game from './components/Game';
 import Dashboard from './pages/Dashboard';
+import Leaderboard from './pages/Leaderboard';
 import { auth, loginAnonymously } from './firebase/config';
 
 function GamePage() {
@@ -62,6 +63,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<GamePage />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/leaderboard" element={<Leaderboard />} />
       </Routes>
       <style>
         {`
