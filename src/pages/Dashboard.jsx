@@ -88,16 +88,26 @@ const Dashboard = () => {
     }
   };
 
-  const formatPlayedAt = (isoString) => {
-    if (!isoString || isoString === 'N/A') return 'N/A';
+  const formatPlayedAt = (val) => {
+    if (!val || val === 'N/A') return 'N/A';
     try {
-      const d = new Date(isoString);
-      if (isNaN(d.getTime())) return isoString;
+      let d;
+      if (val && typeof val.toDate === 'function') {
+        d = val.toDate();
+      } else if (val && typeof val === 'object' && typeof val.seconds === 'number') {
+        d = new Date(val.seconds * 1000);
+      } else {
+        d = new Date(val);
+      }
+      
+      if (isNaN(d.getTime())) {
+        return typeof val === 'object' ? 'N/A' : String(val);
+      }
       
       const options = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
       return d.toLocaleDateString('en-US', options);
     } catch (e) {
-      return isoString;
+      return typeof val === 'object' ? 'N/A' : String(val);
     }
   };
 
@@ -163,15 +173,37 @@ const Dashboard = () => {
   }, [isAuthenticated]);
 
   const downloadExcel = () => {
-    const worksheet = XLSX.utils.json_to_sheet(players.map(p => ({
-      'Rank': p.rank,
-      'Player Name': p.name,
-      'Age': p.age,
-      'Phone Number': p.phone,
-      'High Score (Coins)': p.highscore,
-      'Total Score (Coins)': p.totalScore,
-      'Registered At': p.createdAt
-    })));
+    const worksheet = XLSX.utils.json_to_sheet(players.map(p => {
+      let regAt = 'N/A';
+      if (p.createdAt && p.createdAt !== 'N/A') {
+        try {
+          let d;
+          if (typeof p.createdAt.toDate === 'function') {
+            d = p.createdAt.toDate();
+          } else if (typeof p.createdAt === 'object' && typeof p.createdAt.seconds === 'number') {
+            d = new Date(p.createdAt.seconds * 1000);
+          } else {
+            d = new Date(p.createdAt);
+          }
+          if (!isNaN(d.getTime())) {
+            regAt = d.toLocaleString();
+          } else {
+            regAt = String(p.createdAt);
+          }
+        } catch (e) {
+          regAt = String(p.createdAt);
+        }
+      }
+      return {
+        'Rank': p.rank,
+        'Player Name': p.name,
+        'Age': p.age,
+        'Phone Number': p.phone,
+        'High Score (Coins)': p.highscore,
+        'Total Score (Coins)': p.totalScore,
+        'Registered At': regAt
+      };
+    }));
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Leaderboard");
     XLSX.writeFile(workbook, "myG_Runner_Leaderboard.xlsx");
