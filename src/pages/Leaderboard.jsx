@@ -12,6 +12,9 @@ const Leaderboard = () => {
 
   // 1. Fetch current player's phone from local storage to highlight them
   useEffect(() => {
+    // Reset body style to clear game-specific scrolling lockouts
+    document.body.style.cssText = '';
+
     const stored = window.localStorage.getItem('myg_user_profile');
     if (stored) {
       try {

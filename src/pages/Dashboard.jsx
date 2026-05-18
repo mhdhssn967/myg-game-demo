@@ -32,6 +32,9 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
+    // Reset body style to clear game-specific scrolling lockouts
+    document.body.style.cssText = '';
+
     // Listen to direct Firebase Authentication changes
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user && !user.isAnonymous) {
@@ -594,6 +597,8 @@ const Dashboard = () => {
           color: #fff;
           font-family: 'Inter', sans-serif;
           width: 100%;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
         }
 
         /* Sidebar */
