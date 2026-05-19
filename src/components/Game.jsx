@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Loader from './Loader';
 import StartScreen from './UI/StartScreen';
 import { db, loginAnonymously } from '../firebase/config';
+import { Heart } from 'lucide-react';
 import { doc, setDoc, serverTimestamp, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import runSprite from '../assets/run.png';
 import waveSprite from '../assets/wave.png';
@@ -154,7 +155,21 @@ export default function Game() {
         ];
         Promise.all(allImgs.filter(i => i && i.decode).map(i => i.decode().catch(() => {})))
           .then(() => {
-            setTimeout(() => setIsLoading(false), 800); 
+            setTimeout(() => {
+              setIsLoading(false);
+              const stored = window.localStorage.getItem('myg_user_profile');
+              let parsed = null;
+              if (stored) {
+                try {
+                  parsed = JSON.parse(stored);
+                } catch (e) {}
+              }
+              if (!parsed?.phone) {
+                setShowProfilePrompt(true);
+                setProfileStep('phone');
+                setProfileError('');
+              }
+            }, 800); 
           });
       }
     };
@@ -1285,95 +1300,6 @@ export default function Game() {
     // ── DRAW: HUD (cyberpunk reskin) ──────────────────────────────────────
     function drawHUD() {
       if (state === 'idle') return;
-      
-
-      // Player name display - top center
-      let displayName = 'GUEST';
-      let currentProfile = profileRef.current;
-      if (!currentProfile?.phone) {
-        const stored = window.localStorage.getItem('myg_user_profile');
-        if (stored) {
-          try {
-            currentProfile = JSON.parse(stored);
-          } catch (e) {}
-        }
-      }
-      if (currentProfile?.name) {
-        displayName = currentProfile.name.toUpperCase();
-      }
-
-      ctx.save();
-      const nameFont = '14px "Luckiest Guy"';
-      ctx.font = nameFont;
-      const nameText = `${displayName}`;
-      const nameTextW = ctx.measureText(nameText).width;
-      const boxW = nameTextW + 30;
-      const boxH = 32;
-      const boxX = 15;
-      const boxY = 15;
-
-      // Draw container box
-      ctx.fillStyle = 'rgba(3,1,10,0.85)';
-      ctx.strokeStyle = NEON_ORG;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.roundRect(boxX, boxY, boxW, boxH, 6);
-      ctx.fill();
-      ctx.stroke();
-
-      // Draw inner accent line
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.roundRect(boxX + 2, boxY + 2, boxW - 4, boxH - 4, 4);
-      ctx.stroke();
-
-      // Draw text
-      ctx.fillStyle = '#fff';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(nameText, boxX + boxW / 2, boxY + boxH / 2 + 1);
-      ctx.restore();
-
-      // Draw 3 hearts below player name
-      const heartSize = 10;
-      const spacing = 9;
-      const heartsStartX = boxX + boxW / 2; // Center of hearts row
-      const livesLeftVal = currentProfile?.livesLeft !== undefined ? currentProfile.livesLeft : 3;
-      
-      ctx.save();
-      for (let i = 0; i < 3; i++) {
-        const isFull = i < livesLeftVal;
-        const hx = heartsStartX + (i - 1) * (heartSize + spacing);
-        const hy = boxY + boxH + 8;
-        
-        ctx.save();
-        ctx.translate(hx, hy + heartSize / 2);
-        
-        ctx.beginPath();
-        // Classic Gaming Heart shape (centered at 0, 0)
-        ctx.moveTo(0, -heartSize * 0.35);
-        // Left Lobe
-        ctx.bezierCurveTo(-heartSize * 0.5, -heartSize * 0.85, -heartSize * 0.9, -heartSize * 0.4, -heartSize * 0.9, 0);
-        ctx.bezierCurveTo(-heartSize * 0.9, heartSize * 0.4, -heartSize * 0.4, heartSize * 0.75, 0, heartSize * 0.9);
-        // Right Lobe
-        ctx.bezierCurveTo(heartSize * 0.4, heartSize * 0.75, heartSize * 0.9, heartSize * 0.4, heartSize * 0.9, 0);
-        ctx.bezierCurveTo(heartSize * 0.9, -heartSize * 0.4, heartSize * 0.5, -heartSize * 0.85, 0, -heartSize * 0.35);
-        ctx.closePath();
-        
-        if (isFull) {
-          ctx.fillStyle = NEON_ORG;
-          ctx.shadowColor = 'rgba(255, 107, 0, 0.8)';
-          ctx.shadowBlur = 6;
-          ctx.fill();
-        } else {
-          ctx.strokeStyle = NEON_ORG;
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
-      ctx.restore();
 
       // Coin display — top right
       ctx.save();
@@ -1435,14 +1361,38 @@ export default function Game() {
       ctx.fillText(`SCORE: ${Math.floor(score)}`, W / 2, by + 95);
       ctx.fillText(`COINS: ${coinsCollected}`, W / 2, by + 125);
 
+      // Check lives left to enable/disable retry button
+      let currentProfile = profileRef.current;
+      if (!currentProfile?.phone) {
+        const stored = window.localStorage.getItem('myg_user_profile');
+        if (stored) {
+          try {
+            currentProfile = JSON.parse(stored);
+          } catch (e) {
+            console.warn(e);
+          }
+        }
+      }
+      const livesLeftVal = currentProfile?.livesLeft !== undefined ? currentProfile.livesLeft : 3;
+      const hasLives = livesLeftVal > 0;
+
       // RETRY Button
       const btnW = 150, btnH = 46;
       const btnX = W / 2 - btnW / 2, btnY = by + 155;
-      ctx.fillStyle = '#1a0800';
-      ctx.strokeStyle = NEON_ORG; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.roundRect(btnX, btnY, btnW, btnH, 8); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = NEON_ORG; ctx.font = '18px "Luckiest Guy"';
-      ctx.fillText('RETRY', W / 2, btnY + 29);
+      if (hasLives) {
+        ctx.fillStyle = '#1a0800';
+        ctx.strokeStyle = NEON_ORG; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.roundRect(btnX, btnY, btnW, btnH, 8); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = NEON_ORG; ctx.font = '18px "Luckiest Guy"';
+        ctx.fillText('RETRY', W / 2, btnY + 29);
+      } else {
+        // Disabled style: grayed out, low opacity, no orange neon stroke
+        ctx.fillStyle = '#111111';
+        ctx.strokeStyle = '#333333'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.roundRect(btnX, btnY, btnW, btnH, 8); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#555555'; ctx.font = '18px "Luckiest Guy"';
+        ctx.fillText('RETRY', W / 2, btnY + 29);
+      }
 
       // GO TO HOME Button
       const homeBtnX = W / 2 - btnW / 2, homeBtnY = by + 215;
@@ -1524,6 +1474,23 @@ export default function Game() {
         const btnX = W / 2 - btnW / 2, btnY = by + 155;
         if (clientX >= btnX && clientX <= btnX + btnW &&
             clientY >= btnY && clientY <= btnY + btnH) {
+          // Strictly disable retry button if no lives are left
+          let currentProfile = profileRef.current;
+          if (!currentProfile?.phone) {
+            const stored = window.localStorage.getItem('myg_user_profile');
+            if (stored) {
+              try {
+                currentProfile = JSON.parse(stored);
+              } catch (e) {
+                console.warn(e);
+              }
+            }
+          }
+          const livesLeftVal = currentProfile?.livesLeft !== undefined ? currentProfile.livesLeft : 3;
+          if (livesLeftVal <= 0) {
+            console.log('Retry button clicked but ignored: 0 lives remaining');
+            return;
+          }
           resetGame();
           return;
         }
@@ -2184,10 +2151,9 @@ export default function Game() {
         // Ensure logged in anonymously
         await loginAnonymously().catch((e) => console.warn('Anonymous login inside onPhoneSubmit failed:', e));
 
-        // Start game immediately
+        // Return to start screen
         setShowProfilePrompt(false);
         resetProfileDialog();
-        startTriggerRef.current?.();
       } else {
         // User does not exist! Move to name and age entry step
         setProfileStep('details');
@@ -2237,7 +2203,6 @@ export default function Game() {
 
       setShowProfilePrompt(false);
       resetProfileDialog();
-      startTriggerRef.current?.();
     } catch (err) {
       console.error('Failed to save profile:', err);
       setProfileError('Unable to save your profile right now. Please try again.');
@@ -2247,20 +2212,31 @@ export default function Game() {
   };
 
   const submitScore = async (finalScore) => {
-    try {
-      let currentProfile = profileRef.current;
-      if (!currentProfile?.phone) {
-        const stored = window.localStorage.getItem('myg_user_profile');
-        if (stored) {
-          try {
-            currentProfile = JSON.parse(stored);
-          } catch (e) {
-            console.warn('Failed to parse profile from localStorage in submitScore:', e);
-          }
-        }
+    // 1. Immediately (synchronously) decrement the lives count in local state & localStorage.
+    // This provides an instantaneous "Optimistic UI Update" to block lightspeed retries before DB operations complete.
+    let currentProfile = profileRef.current;
+    if (!currentProfile?.phone) {
+      const stored = window.localStorage.getItem('myg_user_profile');
+      if (stored) {
+        try {
+          currentProfile = JSON.parse(stored);
+        } catch (e) {}
       }
+    }
 
-      console.log('submitScore called with', finalScore, 'profileRef=', profileRef.current, 'localStorageProfile=', currentProfile);
+    if (currentProfile) {
+      const prevLives = currentProfile.livesLeft !== undefined ? Number(currentProfile.livesLeft) : 3;
+      const newLives = Math.max(0, prevLives - 1);
+      const updatedLocalProfile = {
+        ...currentProfile,
+        livesLeft: newLives
+      };
+      window.localStorage.setItem('myg_user_profile', JSON.stringify(updatedLocalProfile));
+      setProfile(updatedLocalProfile);
+      console.log('Optimistically decremented lives locally:', newLives);
+    }
+
+    try {
       if (!currentProfile?.phone) {
         console.warn('No profile phone available; skipping submitScore');
         return;
@@ -2295,6 +2271,7 @@ export default function Game() {
         livesLeft: newLives
       });
 
+      // Keep in sync with the database verified values
       const updatedLocalProfile = {
         ...currentProfile,
         livesLeft: newLives
@@ -2317,6 +2294,69 @@ export default function Game() {
       {isLoading && <Loader progress={loadingProgress} />}
       {!isLoading && gameStatus === 'idle' && (
         <StartScreen onStart={handleStartRequest} profile={profile} />
+      )}
+
+      {/* Lucide React Heart Lives Overlay */}
+      {!isLoading && gameStatus !== 'idle' && (
+        <div style={{
+          position: 'absolute',
+          top: '15px',
+          left: '15px',
+          zIndex: 100,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '8px',
+          pointerEvents: 'none',
+          fontFamily: '"Luckiest Guy", sans-serif',
+          userSelect: 'none',
+        }}>
+          {/* Player Name Container */}
+          <div style={{
+            background: 'rgba(3, 1, 10, 0.85)',
+            border: '2px solid #ff6b00',
+            borderRadius: '6px',
+            padding: '6px 15px',
+            color: '#ffffff',
+            fontSize: '14px',
+            letterSpacing: '0.05em',
+            boxShadow: '0 0 10px rgba(255, 107, 0, 0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: '60px',
+            textTransform: 'uppercase',
+            boxSizing: 'border-box',
+          }}>
+            {profile?.name ? profile.name : 'GUEST'}
+          </div>
+
+          {/* Hearts Row */}
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            {[0, 1, 2].map((i) => {
+              const livesLeftVal = profile?.livesLeft !== undefined ? profile.livesLeft : 3;
+              const isFull = i < livesLeftVal;
+              return (
+                <Heart
+                  key={i}
+                  size={20}
+                  fill={isFull ? '#ff6b00' : 'none'}
+                  stroke="#ff6b00"
+                  strokeWidth={2.5}
+                  style={{
+                    filter: isFull ? 'drop-shadow(0 0 6px rgba(255, 107, 0, 0.8))' : 'none',
+                    transition: 'all 0.3s ease',
+                  }}
+                />
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {showProfilePrompt && (
@@ -2378,9 +2418,11 @@ export default function Game() {
             )}
 
             {profileError && <div style={profileStyles.error}>{profileError}</div>}
-            <button onClick={() => setShowProfilePrompt(false)} style={profileStyles.secondaryButton} disabled={profileSaving}>
-              Cancel
-            </button>
+            {profile?.phone && (
+              <button onClick={() => setShowProfilePrompt(false)} style={profileStyles.secondaryButton} disabled={profileSaving}>
+                Cancel
+              </button>
+            )}
           </div>
         </div>
       )}
