@@ -1385,7 +1385,7 @@ export default function Game() {
       ctx.fillStyle = NEON_ORG; ctx.font = '32px "Luckiest Guy"'; ctx.textAlign = 'center';
       ctx.fillText('GAME OVER', W / 2, by + 52);
       ctx.fillStyle = '#fff'; ctx.font = '20px "Luckiest Guy"';
-      ctx.fillText(`SCORE: ${Math.floor(score)}`, W / 2, by + 95);
+      // ctx.fillText(`SCORE: ${Math.floor(score)}`, W / 2, by + 95);
       ctx.fillText(`COINS: ${coinsCollected}`, W / 2, by + 125);
 
       // Check lives left to enable/disable retry button
