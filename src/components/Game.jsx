@@ -320,7 +320,7 @@ export default function Game() {
     // ── Layout CONSTANTS ──────────────────────────────────────────────────
     let CHAR_X = W * 0.12;
     const GRAVITY = 0.4;
-    const JUMP_VEL = -11;
+    const JUMP_VEL = -12.2;
     const MAX_JUMPS = 2;
 
     const horizontalFrames = 4;
@@ -1538,9 +1538,8 @@ export default function Game() {
       if (bgAudio.current.paused && state === 'running') {
         bgAudio.current.play().catch(() => {});
       }
-      // Allow jump if on ground OR if in mid-air and we still have jumps remaining
-      // (This enables coyote time / ledge recovery jumps when walking off edges)
-      const canJump = onGround || (jumpCount < MAX_JUMPS);
+      // Allow jump if on ground OR if already jumped and have remaining jumps
+      const canJump = onGround || (jumpCount > 0 && jumpCount < MAX_JUMPS);
 
       if (canJump) {
         velY = JUMP_VEL; onGround = false; jumpCount++;
@@ -2012,7 +2011,7 @@ export default function Game() {
         // Collision with character
         const dx = Math.abs(CHAR_X - rocket.x);
         const dy = Math.abs(charY - rocket.y);
-        if (dx < 40 && dy < 40 && state === 'running') {
+        if (dx < 24 && dy < 24 && state === 'running') {
           state = 'shocked';
           setGameStatus('shocked');
           shockTimer = 80; // Show explosion for 1.3s
