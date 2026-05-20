@@ -4,7 +4,7 @@ import StartScreen from './UI/StartScreen';
 import { db, loginAnonymously } from '../firebase/config';
 import { Heart } from 'lucide-react';
 import { doc, setDoc, serverTimestamp, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
-import runSprite from '../assets/run.png';
+import runSprite from '../assets/runnew.png';
 import waveSprite from '../assets/wave.png';
 
 export default function Game() {
@@ -25,6 +25,13 @@ export default function Game() {
   const spriteSheet = useRef(new Image());
   const spriteLoaded = useRef(false);
   const isLoadingRef = useRef(true);
+  
+  const [currentLevel, setCurrentLevel] = useState(1);
+  const currentLevelRef = useRef(1);
+
+  useEffect(() => {
+    currentLevelRef.current = currentLevel;
+  }, [currentLevel]);
   
   useEffect(() => {
     isLoadingRef.current = isLoading;
@@ -268,7 +275,7 @@ export default function Game() {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     
-    const CHAR_SIZE = 80;
+    const CHAR_SIZE = 140;
     let W = canvas.width, H = canvas.height;
     let GROUND_Y = H ? H - 120 : 0;
     let charY = GROUND_Y - CHAR_SIZE / 2;
@@ -342,7 +349,9 @@ export default function Game() {
     // ── Boss/Hazard: Spaceship ──
     let ship = { active: false, x: 0, y: 0, baseY: 0, state: 'idle', timer: 0, shootTimer: 0, shotsLeft: 0, cooldown: 0 };
     let rocket = { active: false, x: 0, y: 0, startX: 0, startY: 0, targetX: 0, targetY: 0, t: 0, rot: 0 };
-    let lastShipMilestone = 0;
+    let lastShipTriggerScore = 0;
+    let level2ShipSpawned = false;
+    let gameTime = 0;
 
     // ── Task 3: Object Pooling ────────────────────────────────────────────
     const COIN_POOL_SIZE = 80;
@@ -550,26 +559,44 @@ export default function Game() {
       return '#' + ((1 << 24) + (Math.round(rr) << 16) + (Math.round(rg) << 8) + Math.round(rb)).toString(16).slice(1);
     }
 
-    function getDayPhase() {
-      const ONE_MIN = 3600; // 60s * 60fps
-      const cycle = (frameCount / ONE_MIN) % 2; // 0..1 is Night, 1..2 is Day
-      let t = (cycle < 1) ? 0 : 1;
-      const transitionFrames = 600; // 10s transition
-      const progress = frameCount % ONE_MIN;
-      if (progress > ONE_MIN - transitionFrames) {
-        const factor = (progress - (ONE_MIN - transitionFrames)) / transitionFrames;
-        t = (cycle < 1) ? factor : 1 - factor;
+    function getSkyColors(time) {
+      // Colors
+      const dayTop = '#1A2980', dayMid = '#26D0CE', dayBot = '#74ebd5'; // Day
+      const eveTop = '#1d0c24', eveMid = '#e64a19', eveBot = '#ffcc80'; // Evening Orange Tinted
+      const nightTop = '#03010a', nightMid = '#0a0418', nightBot = '#120830'; // Night
+
+      if (time < 3000) {
+        // Pure Day (0 to 50 seconds)
+        return { top: dayTop, mid: dayMid, bot: dayBot, t: 1 };
+      } else if (time < 3600) {
+        // Transition Day -> Evening (50 to 60 seconds)
+        const factor = (time - 3000) / 600;
+        return {
+          top: lerpColor(dayTop, eveTop, factor),
+          mid: lerpColor(dayMid, eveMid, factor),
+          bot: lerpColor(dayBot, eveBot, factor),
+          t: 1 - factor * 0.5
+        };
+      } else if (time < 10200) {
+        // Pure Evening (60 to 170 seconds)
+        return { top: eveTop, mid: eveMid, bot: eveBot, t: 0.5 };
+      } else if (time < 10800) {
+        // Transition Evening -> Night (170 to 180 seconds)
+        const factor = (time - 10200) / 600;
+        return {
+          top: lerpColor(eveTop, nightTop, factor),
+          mid: lerpColor(eveMid, nightMid, factor),
+          bot: lerpColor(eveBot, nightBot, factor),
+          t: 0.5 * (1 - factor)
+        };
+      } else {
+        // Pure Night (180+ seconds)
+        return { top: nightTop, mid: nightMid, bot: nightBot, t: 0 };
       }
-      return t;
     }
 
     // ── DRAW: Sky Transition ─────────────────────────────────────────────
-    function drawSky() {
-      const t = getDayPhase();
-      const top = lerpColor(SKY_TOP, DAY_TOP, t);
-      const mid = lerpColor(SKY_MID, DAY_MID, t);
-      const bot = lerpColor(SKY_BOT, DAY_BOT, t);
-      
+    function drawSky(t, top, mid, bot) {
       const g = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
       g.addColorStop(0,   top);
       g.addColorStop(0.5, mid);
@@ -579,15 +606,14 @@ export default function Game() {
     }
 
     // ── DRAW: Celestial (Moon/Sun) ────────────────────────────────────────
-    function drawCelestial() {
-      const t = getDayPhase();
+    function drawCelestial(t) {
       const mx = W * 0.15;
-      const my = H * 0.12 + (1 - t) * 20; // Slight vertical move
+      const my = H * 0.12 + (1 - t) * 20;
       const sy = H * 0.12 + t * 20;
 
       ctx.save();
       
-      // Draw Moon if t < 1
+      // Draw Moon if t < 0.95
       if (t < 0.95) {
         ctx.save();
         ctx.globalAlpha = 1 - t;
@@ -599,7 +625,7 @@ export default function Game() {
         ctx.restore();
       }
 
-      // Draw Sun if t > 0
+      // Draw Sun if t > 0.05
       if (t > 0.05) {
         ctx.save();
         ctx.globalAlpha = t;
@@ -622,14 +648,15 @@ export default function Game() {
       r: 0.5 + Math.random() * 1.5,
       alpha: 0.4 + Math.random() * 0.6,
     }));
-    function drawStars() {
+    function drawStars(t) {
+      if (t >= 0.9) return;
       const tw = 3000;
       const s = (scrollFar * 0.05) % tw;
       ctx.save();
       stars.forEach(st => {
         const sx = ((st.x - s) % tw + tw) % tw;
         if (sx > W + 5) return;
-        ctx.globalAlpha = st.alpha * (0.7 + 0.3 * Math.sin(frameCount * 0.04 + st.phase || 0));
+        ctx.globalAlpha = (1 - t) * st.alpha * (0.7 + 0.3 * Math.sin(frameCount * 0.04 + st.phase || 0));
         ctx.fillStyle = '#fff';
         ctx.beginPath(); ctx.arc(sx, st.y, st.r, 0, Math.PI * 2); ctx.fill();
       });
@@ -925,17 +952,16 @@ export default function Game() {
       if (!loaded) return;
 
       // Dynamic Frame Size detection
-      const fw = isIdle ? 1024 : 768;
-      const fh = isIdle ? 1024 : 448;
+      const fw = isIdle ? 1024 : (sheet.width / 5);
+      const fh = isIdle ? 1024 : (sheet.height / 5);
 
-      const cols = Math.floor(sheet.width / fw) || 1;
-      const rows = Math.floor(sheet.height / fh) || 1;
-      // For the running animation, we know it has 21 frames. 
-      // For others (like wave), we use the full grid.
-      const sheetTotalFrames = isIdle ? (cols * rows) : 21;
+      const cols = isIdle ? (Math.floor(sheet.width / fw) || 1) : 5;
+      const rows = isIdle ? (Math.floor(sheet.height / fh) || 1) : 5;
+      // For the running animation (5x5), there are 25 frames
+      const sheetTotalFrames = isIdle ? (cols * rows) : 25;
       
       let frameIndex = 0;
-      const RUN_FPS = 12;
+      const RUN_FPS = 10 + (speed * 2.0);
       const IDLE_FPS = 10;
       const seconds = (frameCount * 16.67) / 1000;
       
@@ -975,7 +1001,7 @@ export default function Game() {
       // Magnetic rings
       if (magnetTimer > 0) {
         ctx.save();
-        ctx.translate(CHAR_X, charY + 15);
+        ctx.translate(CHAR_X, charY + 42);
         for (let i = 1; i <= 3; i++) {
           ctx.beginPath();
           ctx.arc(0, 0, 40 + i * 15 + Math.sin(frameCount * 0.1) * 5, 0, Math.PI * 2);
@@ -986,8 +1012,8 @@ export default function Game() {
         ctx.restore();
       }
 
-      ctx.translate(CHAR_X + jitterX, charY + 15 + jitterY);
-      if (state === 'running' && !onGround) ctx.rotate(velY * 0.025);
+      ctx.translate(CHAR_X + jitterX, charY + 42 + jitterY);
+      if (state === 'running' && !onGround) ctx.rotate(velY * 0.065);
       
       // If shocked, we use a single frame of the running sheet
       const currentSheet = sheet;
@@ -1511,9 +1537,9 @@ export default function Game() {
       if (bgAudio.current.paused && state === 'running') {
         bgAudio.current.play().catch(() => {});
       }
-      // Allow jump only if on ground OR if already jumping (double jump)
-      // This prevents jumping after walking off an edge into a hole
-      const canJump = onGround || (jumpCount > 0 && jumpCount < MAX_JUMPS);
+      // Allow jump if on ground OR if in mid-air and we still have jumps remaining
+      // (This enables coyote time / ledge recovery jumps when walking off edges)
+      const canJump = onGround || (jumpCount < MAX_JUMPS);
 
       if (canJump) {
         velY = JUMP_VEL; onGround = false; jumpCount++;
@@ -1534,7 +1560,11 @@ export default function Game() {
     document.addEventListener('keydown', onKey);
 
     function resetGame() {
-      score = 0; frameCount = 0; speed = 3.6;
+      score = 0; frameCount = 0; speed = 4.0; // Start Level 1 speed at 4.0
+      gameTime = 0;
+      lastShipTriggerScore = 0;
+      level2ShipSpawned = false;
+      setCurrentLevel(1);
       charY = GROUND_Y - CHAR_SIZE; velY = 0; onGround = true; jumpCount = 0;
       obstacles = []; nextObstacleIn = 90; 
       platforms = []; nextPlatformIn = 60;
@@ -1547,7 +1577,6 @@ export default function Game() {
       setGameStatus('running');
       introTimer = 0; shockTimer = 0;
       ship.active = false; ship.cooldown = 0; ship.state = 'idle';
-      lastShipMilestone = 0;
       rocket.active = false;
       bgAudio.current.currentTime = 0;
       bgAudio.current.play().catch(() => {});
@@ -1592,10 +1621,35 @@ export default function Game() {
       if (state !== 'running') return;
       score += 0.1 * dtScale;
       introTimer += dtScale;
+      gameTime += dtScale;
 
-      // Gradually increase speed until it is 40% more than the original 6.0 (Max: 8.4)
-      if (speed < 8.4) {
-        speed += 0.0008 * dtScale;
+      // Sync calculated level with state
+      const calculatedLevel = gameTime < 3600 ? 1 : (gameTime < 10800 ? 2 : 3);
+      if (calculatedLevel !== currentLevelRef.current) {
+        const prevLevel = currentLevelRef.current;
+        currentLevelRef.current = calculatedLevel;
+        setCurrentLevel(calculatedLevel);
+        
+        if (calculatedLevel > prevLevel) {
+          milestoneText = `LEVEL ${calculatedLevel}!`;
+          milestoneTimer = 180;
+          for (let i = 0; i < 8; i++) {
+            spawnParticle(W / 2 + (i - 3.5) * 50, H / 2, '#ff6b00', 35, true);
+          }
+          yayAudio.current.currentTime = 0;
+          yayAudio.current.play().catch(() => {});
+        }
+      }
+
+      // Level-dependent speed logic
+      if (calculatedLevel === 1) {
+        if (speed < 5.5) speed += 0.0008 * dtScale;
+      } else if (calculatedLevel === 2) {
+        if (speed < 6.0) speed = 6.0;
+        if (speed < 7.5) speed += 0.001 * dtScale;
+      } else {
+        if (speed < 8.0) speed = 8.0;
+        if (speed < 9.5) speed += 0.0012 * dtScale;
       }
 
       const move = speed * dtScale;
@@ -1723,7 +1777,19 @@ export default function Game() {
       if (nextGroundIn <= 0) {
         const isFreePlay = (introTimer / 60) <= 15;
         const gw = isFreePlay ? 1200 : (600 + Math.random() * 800);
-        const gap = isFreePlay ? -10 : (120 + Math.random() * 220); // Overlap by 10px in free play to ensure no gaps
+        
+        let gap = -10;
+        if (!isFreePlay) {
+          const currentLvl = gameTime < 7200 ? 1 : (gameTime < 14400 ? 2 : 3);
+          if (currentLvl === 1) {
+            gap = 80 + Math.random() * 80; // Easy short gaps for Level 1
+          } else if (currentLvl === 2) {
+            gap = 120 + Math.random() * 150; // Medium gaps for Level 2
+          } else {
+            gap = 140 + Math.random() * 200; // Harder/longer gaps for Level 3
+          }
+        }
+        
         const gx = W + gap;
         groundSegments.push({ x: gx, w: gw });
         
@@ -1825,18 +1891,45 @@ export default function Game() {
 
       if (milestoneTimer > 0) milestoneTimer -= dtScale;
 
-      // ── Boss Logic: Spaceship (Trigger: Multiples of 1000) ──
-      const shipMilestone = Math.floor(score / 1000);
-      if (shipMilestone > lastShipMilestone && !ship.active && state === 'running') {
-        lastShipMilestone = shipMilestone;
-        ship.active = true;
-        ship.state = 'entering';
-        ship.x = W + 200;
-        ship.baseY = H * 0.2 + Math.random() * (H * 0.7);
-        ship.y = ship.baseY;
-        ship.timer = 0;
-        ship.shootTimer = 0;
-        ship.shotsLeft = 3;
+      // ── Boss Logic: Spaceship (Trigger: Level based intervals) ──
+      const lvl = gameTime < 3600 ? 1 : (gameTime < 10800 ? 2 : 3);
+      if (state === 'running' && !ship.active) {
+        if (lvl === 2) {
+          if (!level2ShipSpawned) {
+            level2ShipSpawned = true;
+            lastShipTriggerScore = score;
+            ship.active = true;
+            ship.state = 'entering';
+            ship.x = W + 200;
+            ship.baseY = H * 0.2 + Math.random() * (H * 0.5);
+            ship.y = ship.baseY;
+            ship.timer = 0;
+            ship.shootTimer = 0;
+            ship.shotsLeft = 3;
+          } else if (score - lastShipTriggerScore >= 1000) {
+            lastShipTriggerScore = score;
+            ship.active = true;
+            ship.state = 'entering';
+            ship.x = W + 200;
+            ship.baseY = H * 0.2 + Math.random() * (H * 0.5);
+            ship.y = ship.baseY;
+            ship.timer = 0;
+            ship.shootTimer = 0;
+            ship.shotsLeft = 3;
+          }
+        } else if (lvl === 3) {
+          if (score - lastShipTriggerScore >= 500) {
+            lastShipTriggerScore = score;
+            ship.active = true;
+            ship.state = 'entering';
+            ship.x = W + 200;
+            ship.baseY = H * 0.2 + Math.random() * (H * 0.5);
+            ship.y = ship.baseY;
+            ship.timer = 0;
+            ship.shootTimer = 0;
+            ship.shotsLeft = 3;
+          }
+        }
       }
 
       if (ship.active) {
@@ -1933,7 +2026,7 @@ export default function Game() {
 
       // ── Jump Trail logic ──
       if (!onGround && state === 'running') {
-        jumpTrail.push({ x: CHAR_X, y: charY + 15, alpha: 1.0 });
+        jumpTrail.push({ x: CHAR_X, y: charY + 42, alpha: 1.0 });
       }
       if (jumpTrail.length > 25) jumpTrail.shift();
     }
@@ -1941,10 +2034,10 @@ export default function Game() {
     function draw() {
       ctx.clearRect(0, 0, W, H);
 
-      // ── Night sky ──
-      drawSky();
-      drawStars();
-      drawCelestial();
+      const skyColors = getSkyColors(gameTime);
+      drawSky(skyColors.t, skyColors.top, skyColors.mid, skyColors.bot);
+      drawStars(skyColors.t);
+      drawCelestial(skyColors.t);
       drawNeonDust();
 
       // ── Parallax building layers (Task 1) ──
@@ -2356,6 +2449,34 @@ export default function Game() {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Level Indicator Overlay */}
+      {!isLoading && gameStatus !== 'idle' && (
+        <div style={{
+          position: 'absolute',
+          top: '15px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 100,
+          background: 'rgba(3, 1, 10, 0.85)',
+          border: '2px solid #ff6b00',
+          borderRadius: '6px',
+          padding: '6px 20px',
+          color: '#ffffff',
+          fontFamily: '"Luckiest Guy", sans-serif',
+          fontSize: '18px',
+          letterSpacing: '0.08em',
+          boxShadow: '0 0 10px rgba(255, 107, 0, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+          userSelect: 'none',
+          textTransform: 'uppercase',
+        }}>
+          Level {currentLevel}
         </div>
       )}
 

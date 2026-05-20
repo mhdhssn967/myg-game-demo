@@ -1,9 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import waveSprite from '../../assets/wave.png';
+import runSprite from '../../assets/runnew.png';
 
 const StartScreen = ({ onStart, profile }) => {
   const navigate = useNavigate();
+
+
 
   const livesLeft = profile?.livesLeft !== undefined ? profile.livesLeft : 3;
 
@@ -62,9 +64,8 @@ const StartScreen = ({ onStart, profile }) => {
           </div>
         </div>
         
-        {/* Waving Character Animation */}
+        {/* Running Character Animation */}
         <div style={styles.characterSection}>
-          <div style={styles.characterBackglow}></div>
           <div style={styles.characterSprite}></div>
           <div style={styles.characterPlatform}></div>
         </div>
@@ -78,7 +79,7 @@ const StartScreen = ({ onStart, profile }) => {
             <div style={styles.controlItem}>
               <div style={styles.iconBoxOrange}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M7 13l5 5 5-5M7 6l5 5 5-5"/>
+                  <path d="M17 11l-5-5-5 5M17 18l-5-5-5 5"/>
                 </svg>
               </div>
               <div style={styles.controlText}>
@@ -92,7 +93,7 @@ const StartScreen = ({ onStart, profile }) => {
               <div style={styles.iconBoxPurple}>
                 <div style={{ position: 'relative' }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M7 13l5 5 5-5M7 6l5 5 5-5"/>
+                    <path d="M17 11l-5-5-5 5M17 18l-5-5-5 5"/>
                   </svg>
                 </div>
               </div>
@@ -211,27 +212,32 @@ const StartScreen = ({ onStart, profile }) => {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-10px); }
         }
-        @keyframes wave-sprite {
+        @keyframes run-sprite-welcoming {
           0% { background-position: 0% 0%; }
-          5% { background-position: 25% 0%; }
-          10% { background-position: 50% 0%; }
-          15% { background-position: 75% 0%; }
-          20% { background-position: 100% 0%; }
-          25% { background-position: 0% 33.3%; }
-          30% { background-position: 25% 33.3%; }
-          35% { background-position: 50% 33.3%; }
-          40% { background-position: 75% 33.3%; }
-          45% { background-position: 100% 33.3%; }
-          50% { background-position: 0% 66.6%; }
-          55% { background-position: 25% 66.6%; }
-          60% { background-position: 50% 66.6%; }
-          65% { background-position: 75% 66.6%; }
-          70% { background-position: 100% 66.6%; }
-          75% { background-position: 0% 100%; }
-          80% { background-position: 25% 100%; }
-          85% { background-position: 50% 100%; }
-          90% { background-position: 75% 100%; }
-          95% { background-position: 100% 100%; }
+          4.17% { background-position: 25% 0%; }
+          8.33% { background-position: 50% 0%; }
+          12.5% { background-position: 75% 0%; }
+          16.67% { background-position: 100% 0%; }
+          20.83% { background-position: 0% 25%; }
+          25% { background-position: 25% 25%; }
+          29.17% { background-position: 50% 25%; }
+          33.33% { background-position: 75% 25%; }
+          37.5% { background-position: 100% 25%; }
+          41.67% { background-position: 0% 50%; }
+          45.83% { background-position: 25% 50%; }
+          50% { background-position: 50% 50%; }
+          54.17% { background-position: 75% 50%; }
+          58.33% { background-position: 100% 50%; }
+          62.5% { background-position: 0% 75%; }
+          66.67% { background-position: 25% 75%; }
+          70.83% { background-position: 50% 75%; }
+          75% { background-position: 75% 75%; }
+          79.17% { background-position: 100% 75%; }
+          83.33% { background-position: 0% 100%; }
+          87.5% { background-position: 25% 100%; }
+          91.67% { background-position: 50% 100%; }
+          95.83% { background-position: 75% 100%; }
+          100% { background-position: 100% 100%; }
         }
       `}</style>
     </div>
@@ -265,49 +271,41 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '24px',
+    gap: '12px',
     width: '100%',
     maxWidth: '400px',
-    padding: '30px 20px',
+    padding: '16px 15px',
     background: '#03010a',
     border: '2px solid #ff6b00',
     borderRadius: '32px',
     boxShadow: '0 0 100px rgba(255, 107, 0, 0.25)',
     animation: 'start-fade-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
     boxSizing: 'border-box',
-    margin: '20px 0',
+    margin: '10px 0',
   },
   characterSection: {
     position: 'relative',
-    width: '120px',
-    height: '120px',
+    width: '240px',
+    height: '240px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: '-10px',
-  },
-  characterBackglow: {
-    position: 'absolute',
-    width: '120px',
-    height: '120px',
-    background: 'radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%)',
-    borderRadius: '50%',
-    zIndex: 0,
+    marginTop: '-15px',
+    marginBottom: '-40px',
   },
   characterSprite: {
     position: 'relative',
     zIndex: 1,
-    width: '120px',
-    height: '120px',
-    backgroundImage: `url(${waveSprite})`,
-    backgroundSize: '500% 400%',
-    animation: 'wave-sprite 1.2s steps(1) infinite',
-    // Removed orange drop-shadow for limb clarity
+    width: '240px',
+    height: '240px',
+    backgroundImage: `url(${runSprite})`,
+    backgroundSize: '500% 500%',
+    animation: 'run-sprite-welcoming 1.25s steps(1) infinite',
   },
   characterPlatform: {
     position: 'absolute',
-    bottom: '10px',
-    width: '60px',
+    bottom: '15px',
+    width: '125px',
     height: '6px',
     background: 'rgba(255, 255, 255, 0.15)',
     borderRadius: '50%',
@@ -326,12 +324,12 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '12px',
-    marginBottom: '8px',
+    gap: '6px',
+    marginBottom: '4px',
   },
   mainLogo: {
     width: 'auto',
-    height: 'min(15vh, 100px)',
+    height: 'min(12vh, 85px)',
     objectFit: 'contain',
     filter: 'drop-shadow(0 0 15px rgba(255, 107, 0, 0.6))',
     animation: 'start-logo-float 3s ease-in-out infinite',
@@ -339,7 +337,7 @@ const styles = {
   subtitleRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
+    gap: '6px',
   },
   subLine: {
     height: '2px',
@@ -356,7 +354,7 @@ const styles = {
   controlsPanel: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '6px',
     width: '100%',
   },
   panelLabel: {
@@ -369,14 +367,14 @@ const styles = {
   controlsList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px',
+    gap: '6px',
   },
   controlItem: {
     display: 'flex',
     alignItems: 'center',
     gap: '16px',
     background: 'rgba(255, 255, 255, 0.04)',
-    padding: '12px 18px',
+    padding: '8px 14px',
     borderRadius: '16px',
     border: '1px solid rgba(255, 255, 255, 0.08)',
     boxSizing: 'border-box',
@@ -421,8 +419,8 @@ const styles = {
   },
   startButton: {
     width: '100%',
-    marginTop: '8px',
-    padding: '15px 10px',
+    marginTop: '4px',
+    padding: '12px 10px',
     background: '#ff6b00',
     color: 'white',
     border: 'none',
@@ -449,7 +447,7 @@ const styles = {
   leaderboardButton: {
     width: '100%',
     marginTop: '4px',
-    padding: '12px 10px',
+    padding: '9px 10px',
     background: 'rgba(155, 48, 255, 0.08)',
     color: '#b366ff',
     border: '2.5px solid #9b30ff',
@@ -483,14 +481,14 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '8px',
+    gap: '4px',
     width: '100%',
     background: 'rgba(255, 107, 0, 0.05)',
     border: '1px dashed rgba(255, 107, 0, 0.4)',
     borderRadius: '16px',
-    padding: '12px 0',
+    padding: '8px 0',
     boxSizing: 'border-box',
-    marginTop: '6px',
+    marginTop: '2px',
   },
   livesLabel: {
     color: '#ff6b00',

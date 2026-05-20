@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 
-const FULL_DASH = 364.4;
+const FULL_DASH = 314.16;
 
 const STATUS_LABELS = [
   'Initializing...',
@@ -16,7 +16,6 @@ const Loader = ({ progress = 0 }) => {
   const knobRef = useRef(null);
   const pctRef = useRef(null);
   const statusRef = useRef(null);
-  const dotsRef = useRef([]);
 
   useEffect(() => {
     const v = Math.min(100, Math.max(0, progress));
@@ -28,92 +27,60 @@ const Loader = ({ progress = 0 }) => {
       barRef.current.style.width = v + '%';
     }
     if (knobRef.current) {
-      knobRef.current.style.display = v > 2 ? 'block' : 'none';
+      knobRef.current.style.display = v > 3 ? 'block' : 'none';
     }
     if (pctRef.current) {
       pctRef.current.textContent = Math.round(v) + '%';
     }
-
-    const lit = Math.min(4, Math.floor(v / 20));
-    dotsRef.current.forEach((d, i) => {
-      if (!d) return;
-      if (i < lit) {
-        d.style.background = '#ff6b00';
-        d.style.boxShadow = '0 0 8px rgba(255,107,0,0.8)';
-      } else if (i === lit && v > 0) {
-        d.style.background = 'rgba(255,107,0,0.4)';
-        d.style.boxShadow = 'none';
-      } else {
-        d.style.background = 'rgba(255,255,255,0.12)';
-        d.style.boxShadow = 'none';
-      }
-    });
-
     if (statusRef.current) {
-      statusRef.current.textContent = STATUS_LABELS[lit];
+      statusRef.current.textContent = STATUS_LABELS[Math.min(4, Math.floor(v / 20))];
     }
   }, [progress]);
 
   return (
     <div style={styles.root}>
-      {/* Glow orbs */}
-      <div style={{ ...styles.orb, top: -100, left: -100, background: 'radial-gradient(circle, rgba(255,107,0,0.2) 0%, transparent 70%)' }} />
-      <div style={{ ...styles.orb, bottom: -100, right: -100, background: 'radial-gradient(circle, rgba(155,48,255,0.2) 0%, transparent 70%)' }} />
-
-      {/* Animated perspective grid */}
+      {/* Perspective grid */}
       <div style={styles.gridBg} />
 
-      {/* Scanline overlay */}
+      {/* Scanlines */}
       <div style={styles.scanlines} />
+
+      {/* Orbs */}
+      <div style={styles.orbOrange} />
+      <div style={styles.orbPurple} />
+
+      {/* Floor glow line */}
+      <div style={styles.floorLine} />
 
       {/* Content */}
       <div style={styles.content}>
 
-        {/* Ring + logo */}
+        {/* Logo + ring */}
         <div style={styles.spinnerWrap}>
-          <svg width="136" height="136" style={styles.svg}>
-            {/* Tick marks */}
-            {Array.from({ length: 24 }).map((_, i) => {
-              const angle = (i / 24) * 360 - 90;
-              const rad = (angle * Math.PI) / 180;
-              const r1 = 62, r2 = i % 6 === 0 ? 55 : 58;
-              return (
-                <line
-                  key={i}
-                  x1={68 + r1 * Math.cos(rad)}
-                  y1={68 + r1 * Math.sin(rad)}
-                  x2={68 + r2 * Math.cos(rad)}
-                  y2={68 + r2 * Math.sin(rad)}
-                  stroke="rgba(255,255,255,0.12)"
-                  strokeWidth={i % 6 === 0 ? 2 : 1}
-                />
-              );
-            })}
-            {/* Track */}
-            <circle cx="68" cy="68" r="58" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
-            {/* Progress arc */}
+          <svg width="110" height="110" style={styles.svg}>
+            <circle cx="55" cy="55" r="50" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="5" />
             <circle
               ref={ringRef}
-              cx="68" cy="68" r="58"
+              cx="55" cy="55" r="50"
               fill="none"
               stroke="#ff6b00"
-              strokeWidth="6"
+              strokeWidth="5"
               strokeLinecap="round"
               strokeDasharray={FULL_DASH}
               strokeDashoffset={FULL_DASH}
               style={{
                 transform: 'rotate(-90deg)',
-                transformOrigin: '68px 68px',
-                transition: 'stroke-dashoffset 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                transformOrigin: '55px 55px',
+                transition: 'stroke-dashoffset 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
                 filter: 'drop-shadow(0 0 8px rgba(255,107,0,0.9))',
               }}
             />
           </svg>
 
-          {/* Spinning purple ring */}
+          {/* Purple spinning ring */}
           <div style={styles.spinRing} />
 
-          {/* Logo center */}
+          {/* Logo circle */}
           <div style={styles.logoCircle}>
             <img
               src="/images/mygtrans.png"
@@ -121,69 +88,44 @@ const Loader = ({ progress = 0 }) => {
               style={styles.logoImg}
               onError={(e) => {
                 e.target.style.display = 'none';
-                e.target.parentElement.querySelector('.logo-fallback').style.display = 'flex';
+                const fallback = e.target.parentElement.querySelector('.logo-fallback');
+                if (fallback) fallback.style.display = 'flex';
               }}
             />
             <div
               className="logo-fallback"
-              style={{
-                display: 'none',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '100%',
-                height: '100%',
-                fontSize: 20,
-                fontFamily: "'Luckiest Guy', system-ui",
-                color: '#ff6b00',
-                letterSpacing: -1,
-              }}
+              style={styles.logoFallback}
             >
               myG
             </div>
           </div>
         </div>
 
-        {/* Slogan */}
-        <div style={styles.sloganWrap}>
-          <span style={styles.sloganOrange}>PLAY GAME</span>
-          <span style={styles.sloganWhite}>EARN REWARDS</span>
-          <div style={styles.divider} />
+        {/* PLAY & WIN title */}
+        <div style={styles.titleWrap}>
+          <span style={styles.titleOrange}>PLAY</span>
+          <span style={styles.titleAmp}>&amp;</span>
+          <span style={{ ...styles.titleOrange, animationDelay: '0.3s' }}>WIN</span>
         </div>
 
-        {/* Progress UI */}
-        <div style={styles.progressSection}>
-          {/* Status label */}
-          <span ref={statusRef} style={styles.statusText}>
-            {STATUS_LABELS[0]}
-          </span>
+        {/* Divider */}
+        <div style={styles.divider} />
 
-          {/* Bar row */}
-          <div style={styles.barRow}>
-            <div style={styles.barTrack}>
-              <div ref={barRef} style={styles.barFill}>
-                <div ref={knobRef} style={{ ...styles.barKnob, display: 'none' }} />
-              </div>
-              {/* Tick labels */}
-              <div style={styles.tickRow}>
-                {['0', '25', '50', '75', '100'].map((t) => (
-                  <span key={t} style={styles.tickLabel}>{t}</span>
-                ))}
-              </div>
+        {/* Loading bar */}
+        <div style={styles.progressSection}>
+          <div style={styles.barTrack}>
+            <div ref={barRef} style={styles.barFill}>
+              <div ref={knobRef} style={{ ...styles.barKnob, display: 'none' }} />
             </div>
+          </div>
+          <div style={styles.barMeta}>
+            <span ref={statusRef} style={styles.statusText}>
+              {STATUS_LABELS[0]}
+            </span>
             <span ref={pctRef} style={styles.pctLabel}>0%</span>
           </div>
-
-          {/* Segment dots */}
-          <div style={styles.dotsRow}>
-            {[0, 1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                ref={(el) => (dotsRef.current[i] = el)}
-                style={styles.dot}
-              />
-            ))}
-          </div>
         </div>
+
       </div>
 
       <style>{`
@@ -193,8 +135,8 @@ const Loader = ({ progress = 0 }) => {
           to { transform: rotate(360deg); }
         }
         @keyframes myg-pulse-orb {
-          0%, 100% { opacity: 0.8; transform: scale(1); }
-          50%       { opacity: 1;   transform: scale(1.08); }
+          0%, 100% { opacity: 0.7; transform: scale(1); }
+          50%       { opacity: 1;   transform: scale(1.1); }
         }
         @keyframes myg-logo-float {
           0%, 100% { transform: translateY(0px); }
@@ -204,9 +146,33 @@ const Loader = ({ progress = 0 }) => {
           0%   { background-position: 0 0; }
           100% { background-position: 0 4px; }
         }
-        @keyframes myg-status-blink {
-          0%, 80%, 100% { opacity: 0.4; }
-          40%           { opacity: 1; }
+        @keyframes myg-title-glow {
+          0%, 100% {
+            text-shadow:
+              0 0 20px rgba(255,107,0,0.5),
+              0 0 50px rgba(255,107,0,0.2),
+              -2px -2px 0 #7a3000,
+               2px -2px 0 #7a3000,
+              -2px  2px 0 #7a3000,
+               2px  2px 0 #7a3000;
+          }
+          50% {
+            text-shadow:
+              0 0 35px rgba(255,107,0,0.9),
+              0 0 80px rgba(255,107,0,0.4),
+              -2px -2px 0 #7a3000,
+               2px -2px 0 #7a3000,
+              -2px  2px 0 #7a3000,
+               2px  2px 0 #7a3000;
+          }
+        }
+        @keyframes myg-amp-glow {
+          0%, 100% { text-shadow: 0 0 15px #bf80ff, 0 0 40px rgba(155,48,255,0.5); }
+          50%       { text-shadow: 0 0 30px #bf80ff, 0 0 70px rgba(155,48,255,0.8); }
+        }
+        @keyframes myg-bar-glow {
+          0%, 100% { box-shadow: 0 0 10px 2px rgba(255,107,0,0.6); }
+          50%       { box-shadow: 0 0 22px 5px rgba(255,107,0,0.9); }
         }
       `}</style>
     </div>
@@ -227,20 +193,12 @@ const styles = {
     userSelect: 'none',
     fontFamily: "'Luckiest Guy', system-ui, sans-serif",
   },
-  orb: {
-    position: 'absolute',
-    width: 380,
-    height: 380,
-    borderRadius: '50%',
-    animation: 'myg-pulse-orb 4s ease-in-out infinite',
-    pointerEvents: 'none',
-  },
   gridBg: {
     position: 'absolute',
     inset: 0,
-    opacity: 0.13,
+    opacity: 0.15,
     backgroundImage:
-      'linear-gradient(rgba(255,107,0,0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(255,107,0,0.25) 1px, transparent 1px)',
+      'linear-gradient(rgba(255,107,0,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,107,0,0.3) 1px, transparent 1px)',
     backgroundSize: '28px 28px',
     transform: 'perspective(600px) rotateX(58deg) translateY(-18%) scaleX(1.4)',
     transformOrigin: 'center bottom',
@@ -249,10 +207,42 @@ const styles = {
   scanlines: {
     position: 'absolute',
     inset: 0,
-    backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.18) 2px, rgba(0,0,0,0.18) 4px)',
+    backgroundImage:
+      'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px)',
     animation: 'myg-scanlines 0.3s steps(1) infinite',
+    opacity: 0.35,
     pointerEvents: 'none',
-    opacity: 0.4,
+  },
+  orbOrange: {
+    position: 'absolute',
+    top: -80,
+    left: -80,
+    width: 320,
+    height: 320,
+    borderRadius: '50%',
+    background: 'radial-gradient(circle, rgba(255,107,0,0.2) 0%, transparent 70%)',
+    animation: 'myg-pulse-orb 4s ease-in-out infinite 2s',
+    pointerEvents: 'none',
+  },
+  orbPurple: {
+    position: 'absolute',
+    bottom: -100,
+    right: -80,
+    width: 360,
+    height: 360,
+    borderRadius: '50%',
+    background: 'radial-gradient(circle, rgba(155,48,255,0.25) 0%, transparent 70%)',
+    animation: 'myg-pulse-orb 4s ease-in-out infinite',
+    pointerEvents: 'none',
+  },
+  floorLine: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    background: 'linear-gradient(90deg, transparent 0%, #9b30ff 30%, #ff6b00 50%, #9b30ff 70%, transparent 100%)',
+    opacity: 0.6,
   },
   content: {
     position: 'relative',
@@ -260,15 +250,15 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 30,
+    gap: 24,
     width: '100%',
-    maxWidth: 340,
+    maxWidth: 360,
     padding: '40px 28px',
   },
   spinnerWrap: {
     position: 'relative',
-    width: 136,
-    height: 136,
+    width: 110,
+    height: 110,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -280,59 +270,56 @@ const styles = {
   },
   spinRing: {
     position: 'absolute',
-    inset: 10,
+    inset: 8,
     borderRadius: '50%',
     border: '2px solid transparent',
     borderTopColor: '#9b30ff',
     borderLeftColor: 'rgba(155,48,255,0.4)',
-    animation: 'myg-spin 1.5s linear infinite',
+    animation: 'myg-spin 1.8s linear infinite',
     opacity: 0.8,
   },
-  logoCircle: {
-    position: 'absolute',
-    width: 68,
-    height: 68,
-    borderRadius: '50%',
-    background: 'rgba(255,107,0,0.1)',
-    border: '2px solid rgba(255,107,0,0.35)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    animation: 'myg-logo-float 2.4s ease-in-out infinite',
-    boxShadow: '0 0 20px rgba(255,107,0,0.3), inset 0 0 20px rgba(255,107,0,0.05)',
-  },
+
   logoImg: {
-    width: '80%',
-    height: '80%',
+    width: '120px',
+    height: '120px',
     objectFit: 'contain',
     filter: 'drop-shadow(0 0 8px rgba(255,107,0,0.9))',
   },
-  sloganWrap: {
+  logoFallback: {
+    display: 'none',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: '100%',
+    fontSize: 18,
+    color: '#ff6b00',
+    letterSpacing: -1,
+    textShadow: '0 0 12px rgba(255,107,0,0.9)',
+  },
+  titleWrap: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 4,
+    gap: 0,
     textAlign: 'center',
+    lineHeight: 0.95,
   },
-  sloganOrange: {
-    fontSize: 42,
+  titleOrange: {
+    fontSize: 58,
     color: '#ff6b00',
-    lineHeight: 1,
     letterSpacing: 2,
-    textShadow: '0 0 30px rgba(255,107,0,0.6), 0 0 60px rgba(255,107,0,0.2)',
+    WebkitTextStroke: '1.5px #7a3000',
+    animation: 'myg-title-glow 2.5s ease-in-out infinite',
   },
-  sloganWhite: {
-    fontSize: 30,
-    color: '#ffffff',
-    lineHeight: 1,
-    letterSpacing: 3,
-    textShadow: '0 0 20px rgba(255,255,255,0.15)',
+  titleAmp: {
+    fontSize: 44,
+    color: '#bf80ff',
+    letterSpacing: 1,
+    animation: 'myg-amp-glow 2.5s ease-in-out infinite',
   },
   divider: {
-    marginTop: 12,
     height: 2,
-    width: 90,
+    width: 120,
     background: 'linear-gradient(90deg, transparent, #9b30ff 40%, #ff6b00 60%, transparent)',
     borderRadius: 1,
   },
@@ -340,84 +327,54 @@ const styles = {
     width: '100%',
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
-    gap: 12,
-  },
-  statusText: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.35)',
-    letterSpacing: '0.35em',
-    textTransform: 'uppercase',
-    fontFamily: 'monospace',
-    animation: 'myg-status-blink 2s ease-in-out infinite',
-  },
-  barRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    width: '100%',
+    gap: 8,
   },
   barTrack: {
-    flex: 1,
     position: 'relative',
-    height: 5,
-    background: 'rgba(255,255,255,0.08)',
+    height: 6,
+    background: 'rgba(255,255,255,0.09)',
     borderRadius: 99,
+    overflow: 'visible',
   },
   barFill: {
     height: '100%',
     width: '0%',
     borderRadius: 99,
     background: 'linear-gradient(90deg, #cc4a00, #ff6b00, #ffaa55)',
-    position: 'relative',
     transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-    boxShadow: '0 0 12px rgba(255,107,0,0.7)',
+    animation: 'myg-bar-glow 2s ease-in-out infinite',
+    position: 'relative',
   },
   barKnob: {
     position: 'absolute',
-    right: -6,
+    right: -7,
     top: '50%',
     transform: 'translateY(-50%)',
-    width: 14,
-    height: 14,
+    width: 16,
+    height: 16,
     borderRadius: '50%',
     background: '#fff',
     border: '2.5px solid #ff6b00',
-    boxShadow: '0 0 10px rgba(255,107,0,0.9)',
+    boxShadow: '0 0 12px rgba(255,107,0,0.9)',
   },
-  tickRow: {
-    position: 'absolute',
-    top: 10,
-    left: 0,
-    right: 0,
+  barMeta: {
     display: 'flex',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  tickLabel: {
+  statusText: {
     fontSize: 9,
-    color: 'rgba(255,255,255,0.18)',
+    color: 'rgba(255,255,255,0.3)',
+    letterSpacing: '0.3em',
+    textTransform: 'uppercase',
     fontFamily: 'monospace',
   },
   pctLabel: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#ff6b00',
     fontFamily: 'monospace',
-    minWidth: 44,
-    textAlign: 'right',
     fontWeight: 700,
     textShadow: '0 0 10px rgba(255,107,0,0.6)',
-  },
-  dotsRow: {
-    display: 'flex',
-    gap: 7,
-    marginTop: 4,
-  },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: '50%',
-    background: 'rgba(255,255,255,0.12)',
-    transition: 'background 0.3s ease, box-shadow 0.3s ease',
   },
 };
 
