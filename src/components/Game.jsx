@@ -290,6 +290,7 @@ export default function Game() {
       
       W = window.innerWidth;
       H = window.innerHeight;
+      CHAR_X = W * 0.12;
       const oldGround = GROUND_Y;
       GROUND_Y = H - 180;
       if (oldGround > 0 && Math.abs(charY - (oldGround - CHAR_SIZE / 2)) < 2) {
@@ -317,7 +318,7 @@ export default function Game() {
     const SCORE_BG   = 'rgba(10, 5, 20, 0.92)';
 
     // ── Layout CONSTANTS ──────────────────────────────────────────────────
-    const CHAR_X = W * 0.18;
+    let CHAR_X = W * 0.12;
     const GRAVITY = 0.4;
     const JUMP_VEL = -11;
     const MAX_JUMPS = 2;
