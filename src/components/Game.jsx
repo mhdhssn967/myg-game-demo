@@ -1139,8 +1139,8 @@ export default function Game() {
 
         // Collision check
         const dx = Math.abs(CHAR_X - c.x);
-        const dy = Math.abs(charY - c.y);
-        if (dx < 40 && dy < 40 && !c.collected) {
+        const dy = Math.abs((charY + 42) - c.y);
+        if (dx < 55 && dy < 55 && !c.collected) {
           c.collected = true;
           c.active = false;
           if (isSpecial) {
@@ -1751,11 +1751,14 @@ export default function Game() {
           // Spawn Magnet
           magnets.push({ x: px, y: py - 50 });
         } else if (Math.random() > 0.4) {
-          // Spawn Normal Coins in a neat line
+          // Spawn Coins in a neat line
           const coinCount = Math.floor(pw / 60) - 1;
           const pxStart = px - pw/2 + 30;
+          const hasSpecial = Math.random() > 0.75 && coinCount > 0;
+          const specialIndex = hasSpecial ? Math.floor(Math.random() * coinCount) : -1;
           for (let i = 0; i < coinCount; i++) {
-            spawnCoin(pxStart + i * 60, py - 40, false);
+            const isSpecial = (i === specialIndex);
+            spawnCoin(pxStart + i * 60, py - 40, isSpecial);
           }
         }
         
@@ -1798,11 +1801,6 @@ export default function Game() {
         if (Math.random() > 0.94) {
           // Spawn Magnet
           magnets.push({ x: gx + 200, y: GROUND_Y - 50 });
-        } else if (Math.random() > 0.6) {
-          // Occasional single special coin high up over gaps
-          if (Math.random() > 0.7) {
-            spawnCoin(gx + gw/2, GROUND_Y - 260, true);
-          }
         }
         
         nextGroundIn = (gw + gap) / speed;
@@ -1839,10 +1837,7 @@ export default function Game() {
         }
       });
 
-      // Rare High-Altitude Special Coins
-      if (Math.random() < 0.003 * dtScale) {
-        spawnCoin(W + 100, GROUND_Y - 280 - Math.random() * 80, true);
-      }
+
 
       // Update Coins (Task 3: Pooling)
       coinPool.forEach(c => {
@@ -1853,7 +1848,7 @@ export default function Game() {
         if (magnetTimer > 0 && !c.collected) {
            if (c.x < W) {
              const dx = (CHAR_X - c.x);
-             const dy = (charY - c.y);
+             const dy = ((charY + 42) - c.y);
              const dist = Math.sqrt(dx*dx + dy*dy);
              if (dist < 350) {
                c.x += (dx / dist) * 12 * dtScale;

@@ -16,10 +16,14 @@ import {
   Search,
   Bell,
   ChevronRight,
-  Download
+  Download,
+  Tv
 } from 'lucide-react';
+import TVView from '../components/TVView';
 
 const Dashboard = () => {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [hideSidebarOnTv, setHideSidebarOnTv] = useState(true);
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -405,7 +409,7 @@ const Dashboard = () => {
       {isSidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
 
       {/* Sidebar */}
-      <div className={`dashboard-sidebar ${isSidebarOpen ? 'is-open' : ''}`}>
+      <div className={`dashboard-sidebar ${isSidebarOpen ? 'is-open' : ''} ${activeTab === 'tv' && hideSidebarOnTv ? 'tv-hidden' : ''}`}>
         <div className="sidebar-brand">
           <div className="brand-wrap">
             <img src="/images/mygtrans.png" alt="myG" className="sidebar-logo" />
@@ -417,16 +421,34 @@ const Dashboard = () => {
         </div>
 
         <nav className="sidebar-nav">
-          <div className="nav-link active">
+          <div 
+            className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('dashboard'); setSidebarOpen(false); }}
+          >
             <LayoutDashboard size={18} /> Dashboard
           </div>
-          <div className="nav-link">
+          <div 
+            className={`nav-link ${activeTab === 'tv' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('tv'); setSidebarOpen(false); }}
+          >
+            <Tv size={18} /> TV Display View
+          </div>
+          <div 
+            className={`nav-link ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('settings'); setSidebarOpen(false); }}
+          >
             <Gamepad2 size={18} /> Game Settings
           </div>
-          <div className="nav-link">
+          <div 
+            className={`nav-link ${activeTab === 'leaderboard' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('leaderboard'); setSidebarOpen(false); }}
+          >
             <Trophy size={18} /> Leaderboard
           </div>
-          <div className="nav-link">
+          <div 
+            className={`nav-link ${activeTab === 'system' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('system'); setSidebarOpen(false); }}
+          >
             <Settings size={18} /> System
           </div>
         </nav>
@@ -470,123 +492,161 @@ const Dashboard = () => {
       </div>
 
       {/* Main Content */}
-      <div className="dashboard-main">
-        <header className="main-header">
-          <div className="header-text">
-            <h1 className="main-title">Dashboard</h1>
-            <p className="main-subtitle">Real-time player tracking and analytics</p>
-          </div>
-          <div className="header-utils">
-            <div className="header-search">
-              <Search size={16} color="rgba(255,255,255,0.3)" />
-              <input type="text" placeholder="Search players..." />
-            </div>
-            <button className="util-btn">
-              <Bell size={18} />
-            </button>
-          </div>
-        </header>
-
-        <div className="metrics-grid">
-          <div className="metric-card">
-            <div className="card-top">
-              <div className="card-icon-box users">
-                <Users size={20} />
+      <div className={`dashboard-main ${activeTab === 'tv' && hideSidebarOnTv ? 'tv-fullwidth' : ''}`}>
+        {activeTab === 'dashboard' && (
+          <>
+            <header className="main-header">
+              <div className="header-text">
+                <h1 className="main-title">Dashboard</h1>
+                <p className="main-subtitle">Real-time player tracking and analytics</p>
               </div>
-              <span className="card-badge positive">
-                Active
-              </span>
-            </div>
-            <div className="card-body">
-              <span className="card-label">Total Players</span>
-              <h2 className="card-value">{loadingData ? '...' : totalPlayersCount.toLocaleString()}</h2>
-            </div>
-          </div>
-
-          <div className="metric-card">
-            <div className="card-top">
-              <div className="card-icon-box activity">
-                <Activity size={20} />
+              <div className="header-utils">
+                <div className="header-search">
+                  <Search size={16} color="rgba(255,255,255,0.3)" />
+                  <input type="text" placeholder="Search players..." />
+                </div>
+                <button className="util-btn">
+                  <Bell size={18} />
+                </button>
               </div>
-              <span className="card-badge positive">
-                Avg Peak
-              </span>
-            </div>
-            <div className="card-body">
-              <span className="card-label">Avg. Coins</span>
-              <h2 className="card-value">{loadingData ? '...' : averageHighScore.toLocaleString()}</h2>
-            </div>
-          </div>
+            </header>
 
-          <div className="metric-card">
-            <div className="card-top">
-              <div className="card-icon-box trophy">
-                <Trophy size={20} />
+            <div className="metrics-grid">
+              <div className="metric-card">
+                <div className="card-top">
+                  <div className="card-icon-box users">
+                    <Users size={20} />
+                  </div>
+                  <span className="card-badge positive">
+                    Active
+                  </span>
+                </div>
+                <div className="card-body">
+                  <span className="card-label">Total Players</span>
+                  <h2 className="card-value">{loadingData ? '...' : totalPlayersCount.toLocaleString()}</h2>
+                </div>
               </div>
-              <span className="card-badge neutral">Peak</span>
-            </div>
-            <div className="card-body">
-              <span className="card-label">High Score</span>
-              <h2 className="card-value">{loadingData ? '...' : absoluteHighScore.toLocaleString()}</h2>
-            </div>
-          </div>
-        </div>
 
-        <div className="data-section">
-          <div className="section-header">
-            <h2 className="section-title">Leaderboard Analytics</h2>
-            <button className="download-btn" onClick={downloadExcel} disabled={loadingData || players.length === 0}>
-              <Download size={14} /> Download Excel
-            </button>
-          </div>
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Rank</th>
-                  <th>Player Name</th>
-                  <th>Age</th>
-                  <th>Phone Number</th>
-                  <th>High Score (Coins)</th>
-                  <th>Total Coins</th>
-                  <th>Played At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loadingData ? (
-                  <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.4)', fontWeight: '600' }}>
-                      <div className="loading-spinner"></div>
-                      Fetching player analytics from Firestore...
-                    </td>
-                  </tr>
-                ) : players.length === 0 ? (
-                  <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.4)', fontWeight: '600' }}>
-                      No registered players found.
-                    </td>
-                  </tr>
-                ) : (
-                  players.map((player) => (
-                    <tr key={player.id}>
-                      <td>
-                        <div className={`rank-badge rank-${player.rank}`}>
-                          {player.rank}
-                        </div>
-                      </td>
-                      <td className="name-cell">{player.name}</td>
-                      <td className="age-cell">{player.age}</td>
-                      <td className="phone-cell">{player.phone}</td>
-                      <td className="score-cell">{player.highscore.toLocaleString()}</td>
-                      <td className="total-coins-cell" style={{ color: '#9b30ff', fontWeight: '700' }}>{player.totalScore.toLocaleString()}</td>
-                      <td className="played-at-cell">{formatPlayedAt(player.lastPlayedAt)}</td>
+              <div className="metric-card">
+                <div className="card-top">
+                  <div className="card-icon-box activity">
+                    <Activity size={20} />
+                  </div>
+                  <span className="card-badge positive">
+                    Avg Peak
+                  </span>
+                </div>
+                <div className="card-body">
+                  <span className="card-label">Avg. Coins</span>
+                  <h2 className="card-value">{loadingData ? '...' : averageHighScore.toLocaleString()}</h2>
+                </div>
+              </div>
+
+              <div className="metric-card">
+                <div className="card-top">
+                  <div className="card-icon-box trophy">
+                    <Trophy size={20} />
+                  </div>
+                  <span className="card-badge neutral">Peak</span>
+                </div>
+                <div className="card-body">
+                  <span className="card-label">High Score</span>
+                  <h2 className="card-value">{loadingData ? '...' : absoluteHighScore.toLocaleString()}</h2>
+                </div>
+              </div>
+            </div>
+
+            <div className="data-section">
+              <div className="section-header">
+                <h2 className="section-title">Leaderboard Analytics</h2>
+                <button className="download-btn" onClick={downloadExcel} disabled={loadingData || players.length === 0}>
+                  <Download size={14} /> Download Excel
+                </button>
+              </div>
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Rank</th>
+                      <th>Player Name</th>
+                      <th>Age</th>
+                      <th>Phone Number</th>
+                      <th>High Score (Coins)</th>
+                      <th>Total Coins</th>
+                      <th>Played At</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    {loadingData ? (
+                      <tr>
+                        <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.4)', fontWeight: '600' }}>
+                          <div className="loading-spinner"></div>
+                          Fetching player analytics from Firestore...
+                        </td>
+                      </tr>
+                    ) : players.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: 'rgba(255,255,255,0.4)', fontWeight: '600' }}>
+                          No registered players found.
+                        </td>
+                      </tr>
+                    ) : (
+                      players.map((player) => (
+                        <tr key={player.id}>
+                          <td>
+                            <div className={`rank-badge rank-${player.rank}`}>
+                              {player.rank}
+                            </div>
+                          </td>
+                          <td className="name-cell">{player.name}</td>
+                          <td className="age-cell">{player.age}</td>
+                          <td className="phone-cell">{player.phone}</td>
+                          <td className="score-cell">{player.highscore.toLocaleString()}</td>
+                          <td className="total-coins-cell" style={{ color: '#9b30ff', fontWeight: '700' }}>{player.totalScore.toLocaleString()}</td>
+                          <td className="played-at-cell">{formatPlayedAt(player.lastPlayedAt)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'tv' && (
+          <TVView 
+            hideSidebar={hideSidebarOnTv} 
+            setHideSidebar={setHideSidebarOnTv} 
+          />
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="coming-soon-container">
+            <Gamepad2 size={48} className="coming-soon-icon" />
+            <h2 className="coming-soon-title font-goofy">Game Settings</h2>
+            <p className="coming-soon-subtitle">Configure your game settings and physics parameters.</p>
+            <span className="coming-soon-badge font-goofy">COMING SOON</span>
           </div>
-        </div>
+        )}
+
+        {activeTab === 'leaderboard' && (
+          <div className="coming-soon-container">
+            <Trophy size={48} className="coming-soon-icon" />
+            <h2 className="coming-soon-title font-goofy">Leaderboard Panel</h2>
+            <p className="coming-soon-subtitle">Manage bans, profile visibility, and score resets.</p>
+            <span className="coming-soon-badge font-goofy">COMING SOON</span>
+          </div>
+        )}
+
+        {activeTab === 'system' && (
+          <div className="coming-soon-container">
+            <Settings size={48} className="coming-soon-icon" />
+            <h2 className="coming-soon-title font-goofy">System Panel</h2>
+            <p className="coming-soon-subtitle">Modify API keys, database connections, and portal roles.</p>
+            <span className="coming-soon-badge font-goofy">COMING SOON</span>
+          </div>
+        )}
       </div>
 
       <style>{`
@@ -790,6 +850,73 @@ const Dashboard = () => {
           .login-subtitle { font-size: 11px; }
           .login-logo { height: 32px; margin-bottom: 12px; }
           .login-hint { padding-top: 12px; margin-top: 16px; }
+        }
+
+        /* Coming Soon Panel Styling */
+        .coming-soon-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: calc(100vh - 200px);
+          text-align: center;
+          padding: 40px;
+          background: rgba(255, 255, 255, 0.01);
+          border: 1px dashed rgba(255, 255, 255, 0.05);
+          border-radius: 24px;
+          gap: 16px;
+          margin-top: 20px;
+        }
+        .coming-soon-icon {
+          color: #ff6b00;
+          filter: drop-shadow(0 0 10px rgba(255, 107, 0, 0.3));
+          animation: bounce-y 2.5s ease-in-out infinite;
+        }
+        .coming-soon-title {
+          font-size: 28px;
+          margin: 0;
+          color: #fff;
+          letter-spacing: 0.05em;
+        }
+        .coming-soon-subtitle {
+          font-size: 14px;
+          color: rgba(255, 255, 255, 0.4);
+          max-width: 400px;
+          margin: 0;
+          line-height: 1.5;
+        }
+        .coming-soon-badge {
+          font-size: 11px;
+          color: #00ffff;
+          border: 1.5px solid #00ffff;
+          background: rgba(0, 255, 255, 0.05);
+          padding: 6px 16px;
+          border-radius: 20px;
+          letter-spacing: 0.1em;
+          box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+        }
+        @keyframes bounce-y {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-8px); }
+        }
+
+        /* TV Fullwidth Custom Overrides */
+        .dashboard-sidebar.tv-hidden {
+          display: none !important;
+        }
+        /* Boost z-index of visible sidebar to sit on top of fullscreen TVView container */
+        .dashboard-sidebar:not(.tv-hidden) {
+          z-index: 2100 !important;
+        }
+        .sidebar-overlay {
+          z-index: 2050 !important;
+        }
+        .dashboard-main.tv-fullwidth {
+          margin-left: 0 !important;
+          padding: 20px !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          box-sizing: border-box !important;
         }
       `}</style>
     </div>
