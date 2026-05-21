@@ -82,7 +82,7 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
       if (!container) return;
 
       const firstRow = container.querySelector('.tv-roster-row');
-      const rowHeight = firstRow ? firstRow.offsetHeight + 12 : 74; // exact height + 12px flex gap
+      const rowHeight = firstRow ? firstRow.offsetHeight + 8 : 52; // exact height + 8px flex gap
 
       // Check if we are near the bottom of the list
       const isAtBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 16;
@@ -203,8 +203,8 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         </button>
       </div>
 
-      {/* Floating QR Code at Top Right for players to scan and join instantly */}
-      <div className="tv-top-right-qr">
+      {/* Floating QR Code at Bottom Left for players to scan and join instantly */}
+      <div className="tv-bottom-left-qr">
         <div className="qr-wrapper">
           <img 
             src="/images/qr/mygplay_qr_brand.png" 
@@ -354,6 +354,19 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
           </div>
         </div>
       )}
+
+      {/* 📣 Hourly Winner Announcement Ticker Bar */}
+      <footer className="tv-footer-ticker">
+        <div className="ticker-badge font-goofy">
+          <Trophy size={16} className="ticker-trophy" />
+          <span>HOURLY REWARDS</span>
+        </div>
+        <div className="ticker-wrap">
+          <div className="ticker-content">
+            WINNERS ARE SELECTED EVERY HOUR! THE TOP PLAYER FROM EACH HOUR WINS EXCITING REWARDS!
+          </div>
+        </div>
+      </footer>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
@@ -516,26 +529,26 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
           left: 304px; /* 280px sidebar width + 24px padding */
         }
 
-        /* Floating QR Code Card at Top Right (Doubled Size) */
-        .tv-top-right-qr {
+        /* Floating QR Code Card at Bottom Left */
+        .tv-bottom-left-qr {
           position: absolute;
-          top: 24px;
-          right: 24px;
+          bottom: 24px;
+          left: 24px;
           z-index: 100;
           display: flex;
           flex-direction: column;
           align-items: center;
           gap: 10px;
-          background: rgba(10, 5, 24, 0.8);
+          background: rgba(10, 5, 24, 0.85);
           border: 2.5px solid #ff6b00;
-          padding: 12px 14px;
+          padding: 14px 16px;
           border-radius: 28px;
           backdrop-filter: blur(12px);
-          box-shadow: 0 20px 45px rgba(0, 0, 0, 0.75), 0 0 25px rgba(255, 107, 0, 0.3);
+          box-shadow: 0 20px 45px rgba(0, 0, 0, 0.85), 0 0 25px rgba(255, 107, 0, 0.3);
           animation: qr-float 3.5s ease-in-out infinite;
           transition: all 0.3s ease;
         }
-        .tv-top-right-qr:hover {
+        .tv-bottom-left-qr:hover {
           transform: scale(1.03);
           border-color: #ff9e00;
           box-shadow: 0 20px 45px rgba(0, 0, 0, 0.85), 0 0 35px rgba(255, 107, 0, 0.45);
@@ -550,12 +563,12 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
           box-shadow: inset 0 3px 6px rgba(0,0,0,0.15);
         }
         .qr-img {
-          width: 160px; /* DOUBLE SIZE */
-          height: 160px; /* DOUBLE SIZE */
+          width: 190px; /* INCREASED from 160px */
+          height: 190px; /* INCREASED from 160px */
           display: block;
         }
         .qr-label {
-          font-size: 20px; /* DOUBLE SIZE */
+          font-size: 22px; /* INCREASED from 20px */
           color: #ff6b00;
           letter-spacing: 0.12em;
           text-shadow: 0 0 10px rgba(255, 107, 0, 0.5);
@@ -583,7 +596,7 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         .tv-cover-img {
           width: 100%;
           height: auto;
-          max-height: 290px;
+          max-height: 290px; /* Reduced from 290px to fit TV layout perfectly */
           object-fit: cover; /* Full image is shown uncropped */
           border-radius: 20px;
           box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
@@ -612,7 +625,7 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
           background: rgba(10, 5, 24, 0.3);
           border: 1.5px solid rgba(255, 255, 255, 0.04);
           border-radius: 30px;
-          padding: 30px 24px;
+          padding: 16px 24px; /* Reduced padding slightly to save vertical space */
           display: flex;
           flex-direction: column;
           justify-content: center; /* Center podium stands vertically */
@@ -660,24 +673,24 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         }
 
         .avatar-stand {
-          width: 90px;
-          height: 90px;
+          width: 65px; /* Reduced from 90px */
+          height: 65px; /* Reduced from 90px */
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
           box-shadow: 0 10px 25px rgba(0,0,0,0.5);
           z-index: 2;
-          margin-bottom: 12px;
+          margin-bottom: 10px;
         }
         .avatar-stand .emoji {
-          font-size: 38px;
+          font-size: 28px; /* Reduced from 38px */
         }
         .avatar-stand.gold {
-          width: 115px;
-          height: 115px;
+          width: 80px; /* Reduced from 115px */
+          height: 80px; /* Reduced from 115px */
           background: rgba(255, 215, 0, 0.15);
-          border: 3.5px solid #ffd700;
+          border: 3px solid #ffd700;
           box-shadow: 0 0 35px rgba(255, 215, 0, 0.3);
         }
         .avatar-stand.silver {
@@ -693,12 +706,12 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
 
         .crown-holder {
           position: absolute;
-          top: -46px;
+          top: -32px; /* Reduced from -46px */
           z-index: 5;
           animation: float-y 2.5s ease-in-out infinite;
         }
         .gold-crown {
-          font-size: 48px;
+          font-size: 34px; /* Reduced from 48px */
           display: block;
         }
         .animate-crown {
@@ -728,9 +741,9 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         .podium-player-name {
           font-family: 'Inter', sans-serif !important;
           font-weight: 800 !important; /* INCREASED WEIGHT */
-          font-size: 38px;
+          font-size: 24px; /* Reduced from 38px */
           color: #fff;
-          margin: 0 0 10px 0;
+          margin: 0 0 6px 0;
           line-height: 1.1;
           display: -webkit-box;
           -webkit-line-clamp: 1;
@@ -742,7 +755,7 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
           letter-spacing: 0.02em;
         }
         .podium-player-name.gold-name {
-          font-size: 48px;
+          font-size: 32px; /* Reduced from 48px */
           color: #ffe680;
           font-weight: 900 !important; /* ULTRA BOLD CHAMPION */
           text-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
@@ -752,10 +765,10 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         .score-badge {
           display: inline-flex;
           align-items: center;
-          gap: 10px;
-          padding: 8px 18px;
+          gap: 8px;
+          padding: 6px 14px; /* Reduced padding */
           border-radius: 24px;
-          font-size: 22px;
+          font-size: 16px; /* Reduced from 22px */
           box-shadow: 0 6px 12px rgba(0,0,0,0.3);
         }
         .score-badge span {
@@ -766,13 +779,15 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         .score-badge-coin {
           color: #fff;
           opacity: 0.9;
+          width: 16px;
+          height: 16px;
         }
         .score-badge.gold-score {
           background: rgba(255, 215, 0, 0.15);
           border: 1.5px solid rgba(255, 215, 0, 0.35);
           color: #ffd700;
-          font-size: 28px;
-          padding: 10px 28px;
+          font-size: 20px; /* Reduced from 28px */
+          padding: 8px 20px; /* Reduced padding */
           box-shadow: 0 6px 20px rgba(255, 215, 0, 0.15);
         }
         .score-badge.gold-score span {
@@ -803,29 +818,29 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
           box-shadow: 0 10px 30px rgba(0,0,0,0.6);
         }
         .pedestal-number {
-          font-size: 60px;
+          font-size: 44px; /* Reduced from 60px */
           color: rgba(255, 255, 255, 0.08);
           position: absolute;
           line-height: 1;
         }
         .gold-pedestal {
-          height: 180px;
+          height: 135px; /* Reduced from 180px */
           background: linear-gradient(180deg, #b38600 0%, #332700 100%);
           border: 2.5px solid #ffd700;
           border-bottom: none;
         }
         .gold-pedestal .pedestal-number {
-          font-size: 80px;
+          font-size: 60px; /* Reduced from 80px */
           color: rgba(255, 215, 0, 0.15);
         }
         .silver-pedestal {
-          height: 130px;
+          height: 95px; /* Reduced from 130px */
           background: linear-gradient(180deg, #808080 0%, #1a1a1a 100%);
           border: 1.5px solid #c0c0c0;
           border-bottom: none;
         }
         .bronze-pedestal {
-          height: 100px;
+          height: 75px; /* Reduced from 100px */
           background: linear-gradient(180deg, #8c5623 0%, #1f1207 100%);
           border: 1.5px solid #cd7f32;
           border-bottom: none;
@@ -901,7 +916,7 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         .tv-roster-column-list {
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 8px; /* Reduced from 12px */
         }
 
         .tv-roster-row {
@@ -910,8 +925,8 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
           justify-content: space-between;
           background: rgba(255, 255, 255, 0.015);
           border: 1.5px solid rgba(255, 255, 255, 0.03);
-          border-radius: 18px;
-          padding: 14px 24px;
+          border-radius: 14px; /* Reduced from 18px */
+          padding: 8px 16px; /* Reduced from 14px 24px */
           transition: all 0.3s ease;
         }
         .tv-roster-row:hover {
@@ -936,9 +951,9 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         }
 
         .tv-roster-rank {
-          font-size: 20px;
+          font-size: 16px; /* Reduced from 20px */
           color: rgba(255, 255, 255, 0.3);
-          width: 55px;
+          width: 40px; /* Reduced from 55px */
         }
         
         .tv-roster-name-wrap {
@@ -950,7 +965,7 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         .tv-roster-name {
           font-family: 'Inter', sans-serif !important;
           font-weight: 700 !important; /* INCREASED WEIGHT */
-          font-size: 26px;
+          font-size: 18px; /* Reduced from 26px */
           color: #fff;
           text-transform: uppercase;
           letter-spacing: 0.04em;
@@ -973,8 +988,8 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         .tv-roster-score {
           display: flex;
           align-items: center;
-          gap: 10px;
-          font-size: 24px;
+          gap: 8px; /* Reduced from 10px */
+          font-size: 18px; /* Reduced from 24px */
           color: #ff6b00;
           font-family: 'Inter', sans-serif !important;
         }
@@ -1199,6 +1214,69 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
             width: 32px;
             font-size: 14px;
           }
+        }
+
+        /* 📣 Bottom Announcement Ticker Bar */
+        .tv-footer-ticker {
+          position: relative;
+          z-index: 10;
+          display: flex;
+          align-items: center;
+          background: rgba(10, 5, 24, 0.7);
+          border: 2px solid rgba(255, 107, 0, 0.35);
+          border-left: 5px solid #ff6b00;
+          padding: 8px 16px;
+          border-radius: 16px;
+          backdrop-filter: blur(10px);
+          gap: 16px;
+          margin-top: auto; /* Push to the very bottom */
+          box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(255, 107, 0, 0.1);
+          overflow: hidden;
+          flex-shrink: 0;
+        }
+        .ticker-badge {
+          background: #ff6b00;
+          color: #fff;
+          padding: 6px 12px;
+          border-radius: 10px;
+          font-size: 13px;
+          letter-spacing: 0.08em;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          box-shadow: 0 0 15px rgba(255, 107, 0, 0.4);
+          flex-shrink: 0;
+          animation: badge-pulse 2s infinite;
+        }
+        .ticker-trophy {
+          animation: spin 3s linear infinite;
+          color: #fff;
+        }
+        .ticker-wrap {
+          flex: 1;
+          overflow: hidden;
+          display: flex;
+          align-items: center;
+        }
+        .ticker-content {
+          font-family: 'Inter', sans-serif !important;
+          font-weight: 800;
+          font-size: 26px; /* BIG LETTER */
+          color: #ffffff; /* WHITE COLOUR */
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+          white-space: nowrap;
+          animation: ticker-scroll 25s linear infinite;
+        }
+        
+        @keyframes ticker-scroll {
+          0% { transform: translateX(100%); }
+          100% { transform: translateX(-100%); }
+        }
+        @keyframes badge-pulse {
+          0%, 100% { transform: scale(1); box-shadow: 0 0 15px rgba(255, 107, 0, 0.4); }
+          50% { transform: scale(1.03); box-shadow: 0 0 25px rgba(255, 107, 0, 0.6); }
         }
       `}</style>
     </div>
