@@ -4,8 +4,9 @@ import StartScreen from './UI/StartScreen';
 import { db, loginAnonymously } from '../firebase/config';
 import { Heart } from 'lucide-react';
 import { doc, setDoc, serverTimestamp, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
-import runSprite from '../assets/runnew.png';
-import waveSprite from '../assets/wave.png';
+import runSprite from '../assets/runnew.webp';
+import waveSprite from '../assets/wave.webp';
+
 
 export default function Game() {
   const [isLoading, setIsLoading] = useState(true);
@@ -52,6 +53,7 @@ export default function Game() {
   const magnetLoaded = useRef(false);
   const shipImg = useRef(new Image());
   const shipLoaded = useRef(false);
+  const shipCanvas = useRef(null);
 
   const products = ['iphone', 'fridge', 'washing_machine', 'ac', 'laptop', 'microwave', 'tv', 'headphone', 'viccum_cleaner', 'watch', 'blender'];
   const productImages = useRef({});
@@ -201,6 +203,23 @@ export default function Game() {
       asset.ref.current.src = asset.src;
       asset.ref.current.onload = () => {
         asset.flag.current = true;
+        
+        // Pre-render spaceship SVG to an offscreen canvas to prevent first-draw GPU rasterization hang
+        if (asset.ref === shipImg) {
+          try {
+            const canv = document.createElement('canvas');
+            const sW = 120;
+            const sH = sW * (shipImg.current.height / shipImg.current.width) || 60;
+            canv.width = sW;
+            canv.height = sH;
+            const tctx = canv.getContext('2d');
+            tctx.drawImage(shipImg.current, 0, 0, sW, sH);
+            shipCanvas.current = canv;
+          } catch (e) {
+            console.warn('Failed to pre-render spaceship SVG:', e);
+          }
+        }
+        
         incrementProgress();
       };
       asset.ref.current.onerror = incrementProgress;
@@ -227,7 +246,7 @@ export default function Game() {
       });
     }, 6);
 
-    // Load billboards in batches
+    // Load billboards in batches - Using optimized WebP files with automatic fallback to JPEG
     const bbIndices = Array.from({length: 5}, (_, i) => i + 1);
     loadBatch(bbIndices, (i) => {
       return new Promise((resolve) => {
@@ -235,11 +254,15 @@ export default function Game() {
         billboardImages.current.push(img);
         img.onload = () => { incrementProgress(); resolve(); };
         img.onerror = () => {
-          console.error(`Failed to load billboard: /images/billboards/board${i}.jpeg`);
-          incrementProgress();
-          resolve();
+          if (img.src.endsWith('.webp')) {
+            img.src = `/images/billboards/board${i}.jpeg`;
+          } else {
+            console.error(`Failed to load billboard: /images/billboards/board${i}`);
+            incrementProgress();
+            resolve();
+          }
         };
-        img.src = `/images/billboards/board${i}.jpeg`;
+        img.src = `/images/billboards/board${i}.webp`;
       });
     }, 5);
 
@@ -248,8 +271,11 @@ export default function Game() {
       asset.ref.current.src = asset.src;
       asset.ref.current.loop = asset.loop || false;
       asset.ref.current.volume = asset.vol || 1;
-      asset.ref.current.addEventListener('canplaythrough', incrementProgress, { once: true });
-      asset.ref.current.addEventListener('error', incrementProgress, { once: true });
+      // Do not block initial load progress on audio preloading. Mobile browsers block autoplay/preload
+      // until first direct user touch, which makes waiting for them hang/freeze the game's loader.
+      incrementProgress();
+      
+      // Load asynchronously in background
       asset.ref.current.load();
     });
 
@@ -281,8 +307,8 @@ export default function Game() {
     let charY = GROUND_Y - CHAR_SIZE / 2;
 
     const updateSize = (skipBitmaps = false) => {
-      // Cap DPR at 2 to prevent memory crashes on iPhones (Section 5.2)
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      // Cap DPR at 1 for low-end devices, 2 for other screens to prevent memory/GPU stutters (Section 5.2)
+      const dpr = isLowEnd ? 1.0 : Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = window.innerWidth * dpr;
       canvas.height = window.innerHeight * dpr;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -382,6 +408,9 @@ export default function Game() {
     }
 
     function spawnParticle(x, y, color = null, size = null, isSpecial = false) {
+      // Optimize: drop 60% of decorative particles on low-end mobile devices to avoid CPU spikes
+      if (isLowEnd && !isSpecial && Math.random() > 0.4) return;
+
       const p = particlePool.find(part => !part.active);
       if (p) {
         p.active = true; p.x = x; p.y = y;
@@ -397,12 +426,13 @@ export default function Game() {
     }
 
     function spawnExplosion(x, y) {
+      const densityMultiplier = isLowEnd ? 0.4 : 1.0;
       // Fire
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i < 20 * densityMultiplier; i++) {
         spawnParticle(x, y, ['#ff3300', '#ff6b00', '#fff'][Math.floor(Math.random() * 3)], 8 + Math.random() * 12, true);
       }
       // Smoke
-      for (let i = 0; i < 15; i++) {
+      for (let i = 0; i < 15 * densityMultiplier; i++) {
         const p = particlePool.find(part => !part.active);
         if (p) {
           p.active = true; p.x = x; p.y = y;
@@ -650,7 +680,7 @@ export default function Game() {
       alpha: 0.4 + Math.random() * 0.6,
     }));
     function drawStars(t) {
-      if (t >= 0.9) return;
+      if (t >= 0.9 || isLowEnd) return; // Skip entirely on low-end to save 80+ draw calls per frame
       const tw = 3000;
       const s = (scrollFar * 0.05) % tw;
       ctx.save();
@@ -659,13 +689,15 @@ export default function Game() {
         if (sx > W + 5) return;
         ctx.globalAlpha = (1 - t) * st.alpha * (0.7 + 0.3 * Math.sin(frameCount * 0.04 + st.phase || 0));
         ctx.fillStyle = '#fff';
-        ctx.beginPath(); ctx.arc(sx, st.y, st.r, 0, Math.PI * 2); ctx.fill();
+        // Render stars as simple squares (fillRect) instead of expensive round paths (arc)
+        ctx.fillRect(sx - st.r, st.y - st.r, st.r * 2, st.r * 2);
       });
       ctx.restore();
     }
 
     // ── DRAW: Neon ambient dust particles ─────────────────────────────────
     function drawNeonDust() {
+      if (isLowEnd) return; // Skip completely on low-end to save another 60+ draw calls per frame
       const tw = WORLD_W * 2;
       ctx.save();
       neonDust.forEach(p => {
@@ -695,12 +727,16 @@ export default function Game() {
           ctx.fillRect(lx - 2, GROUND_Y - 60, 4, 60);
           // Arm
           ctx.fillRect(lx, GROUND_Y - 60, 18, 3);
-          // Lamp glow bloom
-          ctx.globalAlpha = 0.18;
-          const lg = ctx.createRadialGradient(lx + 18, GROUND_Y - 58, 2, lx + 18, GROUND_Y - 58, 28);
-          lg.addColorStop(0, NEON_ORG); lg.addColorStop(1, 'rgba(0,0,0,0)');
-          ctx.fillStyle = lg;
-          ctx.beginPath(); ctx.arc(lx + 18, GROUND_Y - 58, 28, 0, Math.PI * 2); ctx.fill();
+          
+          if (!isLowEnd) {
+            // Lamp glow bloom - costly radial gradients only drawn on high-end devices
+            ctx.globalAlpha = 0.18;
+            const lg = ctx.createRadialGradient(lx + 18, GROUND_Y - 58, 2, lx + 18, GROUND_Y - 58, 28);
+            lg.addColorStop(0, NEON_ORG); lg.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = lg;
+            ctx.beginPath(); ctx.arc(lx + 18, GROUND_Y - 58, 28, 0, Math.PI * 2); ctx.fill();
+          }
+
           // Lamp bulb
           ctx.globalAlpha = 0.95;
           ctx.fillStyle = NEON_ORG;
@@ -782,7 +818,7 @@ export default function Game() {
     function drawGapElectricity(x, w) {
       if (x + w < 0 || x > W) return;
       
-      const beamCount = 3;
+      const beamCount = isLowEnd ? 1 : 3; // 1 beam for low-end, 3 for regular
       ctx.save();
       for (let i = 0; i < beamCount; i++) {
         if (Math.random() > 0.6) continue;
@@ -795,15 +831,13 @@ export default function Game() {
         const y = GROUND_Y + 20 + i * 20;
         ctx.moveTo(x, y);
         
-        // Jagged electricity steps
-        const steps = 6;
+        // Jagged electricity steps (3 steps for low-end, 6 for regular)
+        const steps = isLowEnd ? 3 : 6;
         for (let s = 1; s <= steps; s++) {
           const sx = x + (w / steps) * s;
           const sy = y + (Math.random() - 0.5) * 15;
           ctx.lineTo(sx, sy);
         }
-        
-        
         
         ctx.stroke();
       }
@@ -1230,11 +1264,9 @@ export default function Game() {
       ctx.save();
       ctx.translate(ship.x, ship.y);
       
-      // Draw the SVG spaceship if loaded, fallback to saucer if not
-      if (shipLoaded.current) {
-        const sW = 120;
-        const sH = sW * (shipImg.current.height / shipImg.current.width) || 60;
-        ctx.drawImage(shipImg.current, -sW / 2, -sH / 2, sW, sH);
+      // Draw the pre-rendered offscreen canvas spaceship to completely eliminate first-draw SVG lags
+      if (shipCanvas.current) {
+        ctx.drawImage(shipCanvas.current, -shipCanvas.current.width / 2, -shipCanvas.current.height / 2);
         
         // Add a pulsing neon glow behind the ship
         const g = ctx.createRadialGradient(0, 0, 10, 0, 0, 80);
@@ -2017,7 +2049,7 @@ export default function Game() {
         }
       }
 
-      floaters = floaters.filter(f => f.alpha > 0);
+      // Redundant floater filter removed (already done in main update block)
 
       // ── Jump Trail logic ──
       if (!onGround && state === 'running') {
@@ -2106,7 +2138,7 @@ export default function Game() {
       if (milestoneTimer > 0) {
         ctx.save();
         ctx.globalAlpha = Math.min(1, milestoneTimer / 20);
-        ctx.fillStyle = NEON_ORG; ctx.font = '50px "Luckiest Guy"';
+        ctx.fillStyle = '#ffffff'; ctx.font = '50px "Luckiest Guy"';
         ctx.textAlign = 'center'; ctx.strokeStyle = '#000'; ctx.lineWidth = 6;
         ctx.strokeText(milestoneText, W / 2, H / 2 - 50);
         ctx.fillText(milestoneText, W / 2, H / 2 - 50);

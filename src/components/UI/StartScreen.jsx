@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import runSprite from '../../assets/runnew.png';
+import runSprite from '../../assets/runnew.webp';
 
 const StartScreen = ({ onStart, profile }) => {
   const navigate = useNavigate();
