@@ -170,13 +170,34 @@ const StartScreen = ({ onStart, profile }) => {
           </svg>
         </button>
 
+        {/* Crafted By GameFaktory Branding */}
+        <a
+          href="https://www.gamefaktory.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={styles.craftedWrap}
+          className="crafted-brand-interactive"
+        >
+          <span style={styles.craftedText}>CRAFTED BY</span>
+          <img src="/images/gflogo.webp" alt="GameFaktory" style={styles.craftedLogo} />
+        </a>
+
         {/* Footer info */}
-        <div style={styles.footer}>
-           BEST EXPERIENCED IN PORTRAIT
-        </div>
+        
       </div>
 
       <style>{`
+        .crafted-brand-interactive {
+          transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+        .crafted-brand-interactive:hover {
+          transform: scale(1.05);
+          opacity: 1;
+        }
+        .crafted-brand-interactive:active {
+          transform: scale(0.97);
+        }
+
         .start-button-interactive {
           transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease;
         }
@@ -521,6 +542,31 @@ const styles = {
     letterSpacing: '0.1em',
     fontWeight: 'bold',
     textTransform: 'uppercase',
+  },
+  craftedWrap: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '4px',
+    marginTop: '8px',
+    marginBottom: '2px',
+    textDecoration: 'none',
+    cursor: 'pointer',
+  },
+  craftedText: {
+    fontSize: '9px',
+    color: 'rgba(255, 255, 255, 0.35)',
+    letterSpacing: '0.25em',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+  },
+  craftedLogo: {
+    height: '22px',
+    width: 'auto',
+    objectFit: 'contain',
+    filter: 'invert(1) drop-shadow(0 0 8px rgba(255, 255, 255, 0.4))',
+    opacity: 0.85,
   }
 };
 

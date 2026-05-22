@@ -1697,11 +1697,13 @@ export default function Game() {
       if (velY >= 0) {
         const charBottom = charY + CHAR_SIZE / 2;
         const charFootX = CHAR_X;
+        const prevCharBottom = charBottom - velY * dtScale;
 
         // Check ground segments
         groundSegments.forEach(g => {
           if (charFootX > g.x && charFootX < g.x + g.w) {
-            if (charBottom >= GROUND_Y && charBottom <= GROUND_Y + 25) {
+            // Sweep collision to prevent tunneling during frame drops
+            if (prevCharBottom <= GROUND_Y + 10 && charBottom >= GROUND_Y) {
               charY = GROUND_Y - CHAR_SIZE / 2;
               velY = 0; onGround = true; jumpCount = 0; stood = true;
             }
@@ -1712,7 +1714,8 @@ export default function Game() {
         if (!stood) {
           platforms.forEach(p => {
             if (charFootX > p.x - p.w / 2 && charFootX < p.x + p.w / 2) {
-              if (charBottom >= p.y && charBottom <= p.y + 25) {
+              // Sweep collision to prevent tunneling during frame drops
+              if (prevCharBottom <= p.y + 10 && charBottom >= p.y) {
                 charY = p.y - CHAR_SIZE / 2;
                 velY = 0; onGround = true; jumpCount = 0; stood = true;
               }

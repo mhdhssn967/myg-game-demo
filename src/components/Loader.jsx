@@ -126,10 +126,33 @@ const Loader = ({ progress = 0 }) => {
           </div>
         </div>
 
+        {/* Crafted By GameFaktory Branding */}
+        <a
+          href="https://www.gamefaktory.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={styles.craftedWrap}
+          className="crafted-brand-interactive"
+        >
+          <span style={styles.craftedText}>CRAFTED BY</span>
+          <img src="/images/gflogo.webp" alt="GameFaktory" style={styles.craftedLogo} />
+        </a>
+
       </div>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap');
+
+        .crafted-brand-interactive {
+          transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+        .crafted-brand-interactive:hover {
+          transform: scale(1.05);
+          opacity: 1;
+        }
+        .crafted-brand-interactive:active {
+          transform: scale(0.97);
+        }
 
         @keyframes myg-spin {
           to { transform: rotate(360deg); }
@@ -375,6 +398,29 @@ const styles = {
     fontFamily: 'monospace',
     fontWeight: 700,
     textShadow: '0 0 10px rgba(255,107,0,0.6)',
+  },
+  craftedWrap: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 24,
+    textDecoration: 'none',
+    cursor: 'pointer',
+  },
+  craftedText: {
+    fontSize: 9,
+    color: 'rgba(255, 255, 255, 0.35)',
+    letterSpacing: '0.25em',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+  },
+  craftedLogo: {
+    height: 24,
+    width: 'auto',
+    objectFit: 'contain',
+    filter: 'invert(1) drop-shadow(0 0 8px rgba(255, 255, 255, 0.4))',
   },
 };
 
