@@ -20,6 +20,7 @@ import {
   Tv
 } from 'lucide-react';
 import TVView from '../components/TVView';
+import AnalyticsView from '../components/AnalyticsView';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -633,6 +634,12 @@ const Dashboard = () => {
             <LayoutDashboard size={18} /> Dashboard
           </div>
           <div 
+            className={`nav-link ${activeTab === 'analytics' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('analytics'); setSidebarOpen(false); }}
+          >
+            <TrendingUp size={18} /> Analytics Menu
+          </div>
+          <div 
             className={`nav-link ${activeTab === 'tv' ? 'active' : ''}`}
             onClick={() => { setActiveTab('tv'); setSidebarOpen(false); }}
           >
@@ -854,6 +861,10 @@ const Dashboard = () => {
               </div>
             </div>
           </>
+        )}
+
+        {activeTab === 'analytics' && (
+          <AnalyticsView />
         )}
 
         {activeTab === 'tv' && (
