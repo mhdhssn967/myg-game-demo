@@ -735,9 +735,11 @@ const Dashboard = () => {
             <div className="data-section">
               <div className="section-header">
                 <h2 className="section-title">Leaderboard Analytics (Hourly Slot: {getCurrentHourBlock()})</h2>
+                {/* 
                 <button className="download-btn" onClick={downloadExcel} disabled={loadingData || players.length === 0}>
                   <Download size={14} /> Download Excel
                 </button>
+                */}
               </div>
               <div className="table-container">
                 <table className="data-table">

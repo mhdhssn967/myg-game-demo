@@ -427,6 +427,43 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         </footer>
       </div>
 
+      {/* Crafted By GameFaktory Branding */}
+      <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: '4px', flexShrink: 0, zIndex: 10 }}>
+        <a
+          href="https://www.gamefaktory.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            textDecoration: 'none',
+            cursor: 'pointer',
+          }}
+          className="crafted-brand-interactive"
+        >
+          <span style={{
+            fontSize: '9px',
+            color: 'rgba(255, 255, 255, 0.35)',
+            letterSpacing: '0.25em',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            fontWeight: 'bold',
+            textTransform: 'uppercase',
+          }}>CRAFTED BY</span>
+          <img 
+            src="/images/gflogo.webp" 
+            alt="GameFaktory" 
+            style={{
+              height: '18px',
+              width: 'auto',
+              objectFit: 'contain',
+              filter: 'invert(1) drop-shadow(0 0 8px rgba(255, 255, 255, 0.4))',
+              opacity: 0.85,
+            }} 
+          />
+        </a>
+      </div>
+
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
 
@@ -861,6 +898,17 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         .animate-slide-up       { animation: slide-up 1s cubic-bezier(.16,1,.3,1) forwards; }
         .animate-slide-up-gold  { animation: slide-up-gold 1.2s cubic-bezier(.16,1,.3,1) forwards; }
         .font-goofy             { font-family: 'Luckiest Guy', cursive; }
+
+        .crafted-brand-interactive {
+          transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+        .crafted-brand-interactive:hover {
+          transform: scale(1.05) !important;
+          opacity: 1;
+        }
+        .crafted-brand-interactive:active {
+          transform: scale(0.97) !important;
+        }
 
         /* ── Responsive ── */
         @media (max-width: 768px) {
