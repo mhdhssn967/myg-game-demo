@@ -28,6 +28,20 @@ const Leaderboard = () => {
     }
   }, []);
 
+  const getCurrentHourBlock = () => {
+    const now = new Date();
+    const startHour = now.getHours();
+    const endHour = (startHour + 1) % 24;
+    
+    const formatHour = (h) => {
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const displayHour = h % 12 === 0 ? 12 : h % 12;
+      return `${displayHour} ${ampm}`;
+    };
+    
+    return `${formatHour(startHour)} - ${formatHour(endHour)}`;
+  };
+
   // 2. Fetch and sort leaderboard data in real-time
   useEffect(() => {
     const fetchLeaderboard = async () => {
@@ -40,21 +54,76 @@ const Leaderboard = () => {
           const phone = docSnap.id;
           
           // Skip documents without names or scores
-          if (data.name && (data.highscore !== undefined || data.totalScore !== undefined)) {
-            const highscore = Number(data.highscore || data.totalScore || 0);
+          if (data.name) {
+            let lastPlayedAt = data.lastPlayedAt || data.lastplayed_at || data.playedAt || 'N/A';
+            if (lastPlayedAt === 'N/A' && data.scores && data.scores.length > 0) {
+              const dates = data.scores
+                .map(s => s.playedAt || s['played at'] || s.played_at)
+                .filter(Boolean);
+              if (dates.length > 0) {
+                dates.sort((a, b) => new Date(b) - new Date(a));
+                lastPlayedAt = dates[0];
+              }
+            }
+
             roster.push({
               phone,
               name: data.name,
-              highscore,
+              highscore: Number(data.highscore || data.totalScore || 0),
+              rawScores: data.scores || [],
+              lastPlayedAt: lastPlayedAt
             });
           }
         });
 
+        // Filter by the current clock hour (e.g. 7-8, 8-9, etc.)
+        const now = new Date();
+        const startOfHour = new Date(now);
+        startOfHour.setMinutes(0, 0, 0);
+        startOfHour.setMilliseconds(0);
+        const endOfHour = new Date(now);
+        endOfHour.setMinutes(59, 59, 999);
+
+        const hourlyPlayers = [];
+        roster.forEach((player) => {
+          let filteredScores = [];
+          if (Array.isArray(player.rawScores) && player.rawScores.length > 0) {
+            filteredScores = player.rawScores.filter(s => {
+              const playedTime = s.playedAt || s['played at'] || s.played_at;
+              if (!playedTime) return false;
+              const d = new Date(playedTime);
+              return d >= startOfHour && d <= endOfHour;
+            });
+          }
+
+          if (filteredScores.length > 0) {
+            const hourlyHigh = Math.max(...filteredScores.map(s => Number(s.score || 0)));
+            
+            // Sort to find the latest playedAt within the current hour
+            const sortedScores = [...filteredScores].sort((a, b) => new Date(b.playedAt || b['played at'] || b.played_at) - new Date(a.playedAt || a['played at'] || a.played_at));
+            const hourlyLast = sortedScores[0].playedAt || sortedScores[0]['played at'] || sortedScores[0].played_at;
+
+            hourlyPlayers.push({
+              ...player,
+              highscore: hourlyHigh,
+              lastPlayedAt: hourlyLast
+            });
+          } else {
+            // Fallback: check if the overall lastPlayedAt is within the current hour
+            if (player.lastPlayedAt && player.lastPlayedAt !== 'N/A') {
+              const d = new Date(player.lastPlayedAt);
+              if (d >= startOfHour && d <= endOfHour) {
+                hourlyPlayers.push(player);
+              }
+            }
+          }
+        });
+
         // Sort by peak coin highscore descending
-        roster.sort((a, b) => b.highscore - a.highscore);
+        hourlyPlayers.sort((a, b) => b.highscore - a.highscore);
         
         // Add rank positions
-        const rankedRoster = roster.map((player, index) => ({
+        const rankedRoster = hourlyPlayers.map((player, index) => ({
           ...player,
           rank: index + 1
         }));
@@ -94,7 +163,7 @@ const Leaderboard = () => {
           <div className="header-title-box">
             <Trophy className="header-trophy" size={32} />
             <h1 className="header-title font-goofy">MYG CHAMPIONS</h1>
-            <p className="header-subtitle">Real-time Hall of Fame Leaderboard</p>
+            <p className="header-subtitle">HOURLY CHALLENGE ({getCurrentHourBlock()})</p>
           </div>
         </header>
 
@@ -197,7 +266,7 @@ const Leaderboard = () => {
 
             {/* 📋 Scrollable Leaderboard List (All Players) */}
             <div className="roster-section">
-              <h2 className="section-label">LEADERBOARD</h2>
+              <h2 className="section-label">HOURLY LEADERBOARD ({getCurrentHourBlock()})</h2>
               
               <div className="roster-list">
                 {players.map((player) => (

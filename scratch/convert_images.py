@@ -1,46 +1,61 @@
 import os
+import glob
 from PIL import Image
 
-def convert_and_resize(src_dir, max_size, quality=80):
-    print(f"Processing directory: {src_dir}")
-    if not os.path.exists(src_dir):
-        print(f"Directory not found: {src_dir}")
-        return
-
-    files = [f for f in os.listdir(src_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+def main():
+    source_dir = r"d:\Oqulix\Oqulix Projects\MYG Platformer Demo\public\toadd"
+    target_dir = r"d:\Oqulix\Oqulix Projects\MYG Platformer Demo\public\images\billboards"
     
-    for filename in files:
-        src_path = os.path.join(src_dir, filename)
-        name, ext = os.path.splitext(filename)
-        dest_path = os.path.join(src_dir, f"{name}.webp")
+    # Ensure target directory exists
+    os.makedirs(target_dir, exist_ok=True)
+    
+    # Find all jpg files
+    jpg_files = glob.glob(os.path.join(source_dir, "*.jpg"))
+    # Sort alphabetically to ensure a deterministic order
+    jpg_files.sort()
+    
+    print(f"Found {len(jpg_files)} JPEG files in source directory.")
+    
+    start_index = 6
+    max_dimension = 800  # Resize high-res 13MB images to max 800px dimension for gaming performance
+    
+    for idx, filepath in enumerate(jpg_files):
+        board_num = start_index + idx
+        target_filename = f"board{board_num}.webp"
+        target_path = os.path.join(target_dir, target_filename)
         
         try:
-            with Image.open(src_path) as img:
-                # Calculate new size while keeping aspect ratio
-                width, height = img.size
-                if width > max_size or height > max_size:
-                    if width > height:
-                        new_width = max_size
-                        new_height = int(height * (max_size / width))
-                    else:
-                        new_height = max_size
-                        new_width = int(width * (max_size / height))
-                    img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                    print(f"Resized {filename} from {width}x{height} to {new_width}x{new_height}")
+            with Image.open(filepath) as img:
+                orig_width, orig_height = img.size
                 
-                # Convert to WebP and save
-                img.save(dest_path, "WEBP", quality=quality)
-                orig_size = os.path.getsize(src_path) / 1024
-                webp_size = os.path.getsize(dest_path) / 1024
-                print(f"Converted {filename} ({orig_size:.1f} KB) -> {name}.webp ({webp_size:.1f} KB) - Savings: {((orig_size - webp_size) / orig_size) * 100:.1f}%")
+                # Calculate new size while maintaining aspect ratio
+                if orig_width > max_dimension or orig_height > max_dimension:
+                    if orig_width > orig_height:
+                        new_width = max_dimension
+                        new_height = int((orig_height / orig_width) * max_dimension)
+                    else:
+                        new_height = max_dimension
+                        new_width = int((orig_width / orig_height) * max_dimension)
+                        
+                    # Use LANCZOS for high-quality downsampling
+                    resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                else:
+                    resized_img = img
+                    new_width, new_height = orig_width, orig_height
+                
+                # Save as WebP
+                resized_img.save(target_path, format="WEBP", quality=82)
+                
+                # Get file sizes for reporting
+                orig_size_mb = os.path.getsize(filepath) / (1024 * 1024)
+                new_size_kb = os.path.getsize(target_path) / 1024
+                
+                print(f"[{idx+1}/{len(jpg_files)}] Converted: {os.path.basename(filepath)}")
+                print(f"  Size: {orig_width}x{orig_height} ({orig_size_mb:.2f} MB) -> {new_width}x{new_height} ({new_size_kb:.1f} KB)")
+                print(f"  Saved as: {target_filename}")
+                
         except Exception as e:
-            print(f"Error processing {filename}: {e}")
+            print(f"Error processing {filepath}: {e}")
 
 if __name__ == "__main__":
-    # Convert products (max size 400px for gameplay obstacles)
-    convert_and_resize("public/images/products", 400, quality=80)
-    
-    # Convert billboards (max size 800px for background displays)
-    convert_and_resize("public/images/billboards", 800, quality=80)
-    
-    print("Conversion complete!")
+    main()

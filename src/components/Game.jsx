@@ -148,7 +148,7 @@ export default function Game() {
       { ref: explosionAudio, src: '/sounds/explosion.mp3', vol: 0.9 },
     ];
 
-    const totalToLoad = imageAssets.length + productList.length + 5 + audioAssetsList.length;
+    const totalToLoad = imageAssets.length + productList.length + 16 + audioAssetsList.length;
     let loadedCount = 0;
 
     const incrementProgress = () => {
@@ -247,7 +247,7 @@ export default function Game() {
     }, 6);
 
     // Load billboards in batches - Using optimized WebP files with automatic fallback to JPEG
-    const bbIndices = Array.from({length: 5}, (_, i) => i + 1);
+    const bbIndices = Array.from({length: 16}, (_, i) => i + 1);
     loadBatch(bbIndices, (i) => {
       return new Promise((resolve) => {
         const img = new Image();
@@ -535,7 +535,7 @@ export default function Game() {
         y: minY + Math.random() * (maxY - minY),
         w: 180 + Math.random() * 260, // Clearer poster size
         h: 120 + Math.random() * 160,
-        adIndex: Math.floor(Math.random() * 5),
+        adIndex: Math.floor(Math.random() * 16),
         floatOff: Math.random() * Math.PI * 2,
         flicker: Math.random(),
         glowColor: Math.random() > 0.5 ? NEON_ORG : NEON_PRP
@@ -558,8 +558,8 @@ export default function Game() {
 
     // Billboards
     // Adjusted another 15% up to sit in the upper mid-background
-    const adsMid  = genBillboards(2, WORLD_W * 2.5, H * 0.45, H * 0.52);
-    const adsNear = genBillboards(2, WORLD_W * 2,   H * 0.48, H * 0.58);
+    const adsMid  = genBillboards(6, WORLD_W * 2.5, H * 0.45, H * 0.52);
+    const adsNear = genBillboards(6, WORLD_W * 2,   H * 0.48, H * 0.58);
 
     // Initial background bitmap generation (uses bld lists)
     initBackgroundBitmaps();

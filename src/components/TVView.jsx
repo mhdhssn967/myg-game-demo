@@ -11,7 +11,21 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
   const [isAutoScrolling, setIsAutoScrolling] = useState(true);
   const listRef = useRef(null);
 
-  // 1. Fetch and sort leaderboard data - limited to top 50 players
+  const getCurrentHourBlock = () => {
+    const now = new Date();
+    const startHour = now.getHours();
+    const endHour = (startHour + 1) % 24;
+    
+    const formatHour = (h) => {
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const displayHour = h % 12 === 0 ? 12 : h % 12;
+      return `${displayHour} ${ampm}`;
+    };
+    
+    return `${formatHour(startHour)} - ${formatHour(endHour)}`;
+  };
+
+  // 1. Fetch and sort leaderboard data - limited to top 50 players in current clock hour
   const fetchLeaderboardData = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'users'));
@@ -39,15 +53,61 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
           name: data.name || 'Anonymous',
           highscore: Number(data.highscore || data.totalScore || data.highScore || 0),
           totalScore: Number(data.totalScore || data.highscore || 0),
-          lastPlayedAt: lastPlayedAt
+          lastPlayedAt: lastPlayedAt,
+          rawScores: data.scores || []
         });
       });
 
+      // Filter by the current clock hour (e.g. 7-8, 8-9, etc.)
+      const now = new Date();
+      const startOfHour = new Date(now);
+      startOfHour.setMinutes(0, 0, 0);
+      startOfHour.setMilliseconds(0);
+      const endOfHour = new Date(now);
+      endOfHour.setMinutes(59, 59, 999);
+
+      const hourlyPlayers = [];
+      fetchedPlayers.forEach((player) => {
+        let filteredScores = [];
+        if (Array.isArray(player.rawScores) && player.rawScores.length > 0) {
+          filteredScores = player.rawScores.filter(s => {
+            const playedTime = s.playedAt || s['played at'] || s.played_at;
+            if (!playedTime) return false;
+            const d = new Date(playedTime);
+            return d >= startOfHour && d <= endOfHour;
+          });
+        }
+
+        if (filteredScores.length > 0) {
+          const hourlyHigh = Math.max(...filteredScores.map(s => Number(s.score || 0)));
+          const hourlyTotal = filteredScores.reduce((sum, s) => sum + Number(s.score || 0), 0);
+          
+          // Sort to find the latest playedAt within the current hour
+          const sortedScores = [...filteredScores].sort((a, b) => new Date(b.playedAt || b['played at'] || b.played_at) - new Date(a.playedAt || a['played at'] || a.played_at));
+          const hourlyLast = sortedScores[0].playedAt || sortedScores[0]['played at'] || sortedScores[0].played_at;
+
+          hourlyPlayers.push({
+            ...player,
+            highscore: hourlyHigh,
+            totalScore: hourlyTotal,
+            lastPlayedAt: hourlyLast
+          });
+        } else {
+          // Fallback: check if the overall lastPlayedAt is within the current hour
+          if (player.lastPlayedAt && player.lastPlayedAt !== 'N/A') {
+            const d = new Date(player.lastPlayedAt);
+            if (d >= startOfHour && d <= endOfHour) {
+              hourlyPlayers.push(player);
+            }
+          }
+        }
+      });
+
       // Sort by highscore descending (highest score first)
-      fetchedPlayers.sort((a, b) => b.highscore - a.highscore);
+      hourlyPlayers.sort((a, b) => b.highscore - a.highscore);
 
       // Only slice top 50 players
-      const top50 = fetchedPlayers.slice(0, 50);
+      const top50 = hourlyPlayers.slice(0, 50);
 
       // Assign ranks
       const rankedPlayers = top50.map((player, index) => ({
@@ -203,24 +263,6 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         </button>
       </div>
 
-      {/* Floating QR Code at Bottom Left for players to scan and join instantly */}
-      <div className="tv-bottom-left-qr">
-        <div className="qr-wrapper">
-          <img 
-            src="/images/qr/mygplay_qr_brand.png" 
-            alt="Scan to Play" 
-            className="qr-img" 
-            onError={(e) => {
-              // Fallback to standard SVG if brand PNG fails
-              e.target.src = "/images/qr/mygplay_qr.svg";
-            }}
-          />
-        </div>
-        <div className="qr-label font-goofy">
-          <span>SCAN TO PLAY</span>
-        </div>
-      </div>
-
       {/* Header Cover Banner (Fully Visible & Uncropped) */}
       <header className="tv-header-cover">
         <img src="/images/cover.webp" alt="myG Champions Stand Cover" className="tv-cover-img" />
@@ -241,6 +283,23 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         <div className="tv-grid-layout">
           {/* TOP SECTION: THE PODIUM STAND (Spans full width) */}
           <div className="podium-container">
+            {/* Floating QR Code at Top Left of podium stand for players to scan and join instantly */}
+            <div className="tv-bottom-left-qr">
+              <div className="qr-wrapper">
+                <img 
+                  src="/images/qr/mygplay_qr_brand.png" 
+                  alt="Scan to Play" 
+                  className="qr-img" 
+                  onError={(e) => {
+                    // Fallback to standard SVG if brand PNG fails
+                    e.target.src = "/images/qr/mygplay_qr.svg";
+                  }}
+                />
+              </div>
+              <div className="qr-label font-goofy">
+                <span>SCAN TO PLAY</span>
+              </div>
+            </div>
           
             
             <div className="tv-podium">
@@ -324,8 +383,8 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
           {/* RIGHT SECTION: SINGLE-COLUMN LEADERBOARD LIST (Ranks 4-50) */}
           <div className="roster-container">
             <div className="roster-header">
-              <span className="roster-header-title font-goofy">HALL OF FAME (TOP 50)</span>
-              <span className="roster-count font-goofy">{players.length} PLAYERS REGISTERED</span>
+              <span className="roster-header-title font-goofy">HOURLY CHAMPIONS ({getCurrentHourBlock()})</span>
+              <span className="roster-count font-goofy">{players.length} ACTIVE PLAYERS</span>
             </div>
 
             <div className="tv-roster-scroll-box" ref={listRef}>
@@ -532,47 +591,48 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         /* Floating QR Code Card at Bottom Left */
         .tv-bottom-left-qr {
           position: absolute;
-          bottom: 24px;
+          top: 24px; /* Positioned at top-left of podium container to float in empty space */
           left: 24px;
+          bottom: auto; /* Clear previous bottom constraint */
           z-index: 100;
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 10px;
+          gap: 6px; /* Slightly tighter gap */
           background: rgba(10, 5, 24, 0.85);
-          border: 2.5px solid #ff6b00;
-          padding: 14px 16px;
-          border-radius: 28px;
+          border: 2px solid #ff6b00; /* Cleaner border */
+          padding: 10px; /* More compact card padding */
+          border-radius: 20px; /* Matching border radius */
           backdrop-filter: blur(12px);
-          box-shadow: 0 20px 45px rgba(0, 0, 0, 0.85), 0 0 25px rgba(255, 107, 0, 0.3);
+          box-shadow: 0 15px 35px rgba(0, 0, 0, 0.85), 0 0 20px rgba(255, 107, 0, 0.25);
           animation: qr-float 3.5s ease-in-out infinite;
           transition: all 0.3s ease;
         }
         .tv-bottom-left-qr:hover {
           transform: scale(1.03);
           border-color: #ff9e00;
-          box-shadow: 0 20px 45px rgba(0, 0, 0, 0.85), 0 0 35px rgba(255, 107, 0, 0.45);
+          box-shadow: 0 15px 35px rgba(0, 0, 0, 0.85), 0 0 30px rgba(255, 107, 0, 0.4);
         }
         .qr-wrapper {
           background: #fff;
-          padding: 10px;
-          border-radius: 18px;
+          padding: 6px; /* Tighter wrapper padding */
+          border-radius: 12px;
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: inset 0 3px 6px rgba(0,0,0,0.15);
+          box-shadow: inset 0 2px 4px rgba(0,0,0,0.15);
         }
         .qr-img {
-          width: 190px; /* INCREASED from 160px */
-          height: 190px; /* INCREASED from 160px */
+          width: 140px; /* Resized to 140px for scannability from distance without overlapping silver pedestal */
+          height: 140px; /* Resized to 140px for scannability from distance without overlapping silver pedestal */
           display: block;
         }
         .qr-label {
-          font-size: 22px; /* INCREASED from 20px */
+          font-size: 15px; /* Clean proportional label size */
           color: #ff6b00;
-          letter-spacing: 0.12em;
-          text-shadow: 0 0 10px rgba(255, 107, 0, 0.5);
-          margin-top: 4px;
+          letter-spacing: 0.1em;
+          text-shadow: 0 0 8px rgba(255, 107, 0, 0.5);
+          margin-top: 2px;
           text-align: center;
         }
 
@@ -635,6 +695,7 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
           flex: 1.5; /* Takes up left side (Gives more space to top 3) */
           min-width: 0;
           height: 100%;
+          position: relative; /* Enabled relative alignment context for child absolute QR box */
         }
         .podium-header {
           font-size: 22px;
@@ -1128,13 +1189,16 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         }
 
         /* Responsive Breakpoints */
-        @media (max-width: 1024px) {
+        @media (max-width: 768px) and (orientation: portrait), (max-width: 600px) {
+          .tv-bottom-left-qr {
+            display: none !important; /* Hide QR code on mobile screens as scanning their own screen is impossible */
+          }
           .tv-dashboard {
             height: auto !important;
             min-height: calc(100vh - 80px) !important;
           }
           .tv-grid-layout {
-            flex-direction: column; /* Stack panels vertically on tablet and smaller screens */
+            flex-direction: column; /* Stack panels vertically on portrait mobile devices */
             height: auto;
             gap: 20px;
           }
@@ -1163,7 +1227,7 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
           }
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 480px) {
           .tv-dashboard {
             padding: 12px;
           }

@@ -121,6 +121,20 @@ const Dashboard = () => {
   const [players, setPlayers] = useState([]);
   const [loadingData, setLoadingData] = useState(false);
 
+  const getCurrentHourBlock = () => {
+    const now = new Date();
+    const startHour = now.getHours();
+    const endHour = (startHour + 1) % 24;
+    
+    const formatHour = (h) => {
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const displayHour = h % 12 === 0 ? 12 : h % 12;
+      return `${displayHour} ${ampm}`;
+    };
+    
+    return `${formatHour(startHour)} - ${formatHour(endHour)}`;
+  };
+
   useEffect(() => {
     if (!isAuthenticated) return;
     
@@ -155,15 +169,61 @@ const Dashboard = () => {
             highscore: data.highscore || 0,
             totalScore: data.totalScore || 0,
             lastPlayedAt: lastPlayedAt,
-            createdAt: data.createdAt || 'N/A'
+            createdAt: data.createdAt || 'N/A',
+            rawScores: data.scores || []
           });
+        });
+
+        // Filter by the current clock hour (e.g. 7-8, 8-9, etc.)
+        const now = new Date();
+        const startOfHour = new Date(now);
+        startOfHour.setMinutes(0, 0, 0);
+        startOfHour.setMilliseconds(0);
+        const endOfHour = new Date(now);
+        endOfHour.setMinutes(59, 59, 999);
+
+        const hourlyPlayers = [];
+        fetchedPlayers.forEach((player) => {
+          let filteredScores = [];
+          if (Array.isArray(player.rawScores) && player.rawScores.length > 0) {
+            filteredScores = player.rawScores.filter(s => {
+              const playedTime = s.playedAt || s['played at'] || s.played_at;
+              if (!playedTime) return false;
+              const d = new Date(playedTime);
+              return d >= startOfHour && d <= endOfHour;
+            });
+          }
+
+          if (filteredScores.length > 0) {
+            const hourlyHigh = Math.max(...filteredScores.map(s => Number(s.score || 0)));
+            const hourlyTotal = filteredScores.reduce((sum, s) => sum + Number(s.score || 0), 0);
+            
+            // Sort to find the latest playedAt within the current hour
+            const sortedScores = [...filteredScores].sort((a, b) => new Date(b.playedAt || b['played at'] || b.played_at) - new Date(a.playedAt || a['played at'] || a.played_at));
+            const hourlyLast = sortedScores[0].playedAt || sortedScores[0]['played at'] || sortedScores[0].played_at;
+
+            hourlyPlayers.push({
+              ...player,
+              highscore: hourlyHigh,
+              totalScore: hourlyTotal,
+              lastPlayedAt: hourlyLast
+            });
+          } else {
+            // Fallback: check if the overall lastPlayedAt is within the current hour
+            if (player.lastPlayedAt && player.lastPlayedAt !== 'N/A') {
+              const d = new Date(player.lastPlayedAt);
+              if (d >= startOfHour && d <= endOfHour) {
+                hourlyPlayers.push(player);
+              }
+            }
+          }
         });
         
         // Sort players by highscore in descending order (highest score first)
-        fetchedPlayers.sort((a, b) => b.highscore - a.highscore);
+        hourlyPlayers.sort((a, b) => b.highscore - a.highscore);
         
         // Assign ranks based on sorted highscore
-        const rankedPlayers = fetchedPlayers.map((player, index) => ({
+        const rankedPlayers = hourlyPlayers.map((player, index) => ({
           ...player,
           rank: index + 1
         }));
@@ -179,41 +239,157 @@ const Dashboard = () => {
     fetchPlayers();
   }, [isAuthenticated]);
 
-  const downloadExcel = () => {
-    const worksheet = XLSX.utils.json_to_sheet(players.map(p => {
-      let regAt = 'N/A';
-      if (p.createdAt && p.createdAt !== 'N/A') {
-        try {
-          let d;
-          if (typeof p.createdAt.toDate === 'function') {
-            d = p.createdAt.toDate();
-          } else if (typeof p.createdAt === 'object' && typeof p.createdAt.seconds === 'number') {
-            d = new Date(p.createdAt.seconds * 1000);
-          } else {
-            d = new Date(p.createdAt);
+  const downloadExcel = async () => {
+    setLoadingData(true);
+    try {
+      const querySnapshot = await getDocs(collection(db, 'users'));
+      const allPlays = [];
+
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const name = data.name || 'Anonymous';
+        const phone = data.phone || docSnap.id || 'N/A';
+        const age = data.age || 'N/A';
+        
+        if (Array.isArray(data.scores) && data.scores.length > 0) {
+          data.scores.forEach(s => {
+            const playedTime = s.playedAt || s['played at'] || s.played_at;
+            if (playedTime) {
+              allPlays.push({
+                name,
+                phone,
+                age,
+                score: Number(s.score || 0),
+                playedAt: new Date(playedTime)
+              });
+            }
+          });
+        } else if (data.highscore !== undefined || data.totalScore !== undefined) {
+          // Fallback for single/legacy play
+          const playedTime = data.lastPlayedAt || data.playedAt || data.createdAt;
+          if (playedTime) {
+            let parsedTime;
+            if (playedTime && typeof playedTime.toDate === 'function') {
+              parsedTime = playedTime.toDate();
+            } else if (playedTime && typeof playedTime === 'object' && typeof playedTime.seconds === 'number') {
+              parsedTime = new Date(playedTime.seconds * 1000);
+            } else {
+              parsedTime = new Date(playedTime);
+            }
+            
+            if (!isNaN(parsedTime.getTime())) {
+              allPlays.push({
+                name,
+                phone,
+                age,
+                score: Number(data.highscore || data.totalScore || 0),
+                playedAt: parsedTime
+              });
+            }
           }
-          if (!isNaN(d.getTime())) {
-            regAt = d.toLocaleString();
-          } else {
-            regAt = String(p.createdAt);
-          }
-        } catch (e) {
-          regAt = String(p.createdAt);
         }
+      });
+
+      if (allPlays.length === 0) {
+        alert("No player game data found to export.");
+        return;
       }
-      return {
-        'Rank': p.rank,
-        'Player Name': p.name,
-        'Age': p.age,
-        'Phone Number': p.phone,
-        'High Score (Coins)': p.highscore,
-        'Total Score (Coins)': p.totalScore,
-        'Registered At': regAt
+
+      const getHourSlotString = (date) => {
+        const d = new Date(date);
+        if (isNaN(d.getTime())) return 'Unknown Hour';
+        
+        const optionsDate = { month: 'short', day: 'numeric' };
+        const dateStr = d.toLocaleDateString('en-US', optionsDate);
+        
+        const startHour = d.getHours();
+        const endHour = (startHour + 1) % 24;
+        
+        const formatHour = (h) => {
+          const ampm = h >= 12 ? 'PM' : 'AM';
+          const displayHour = h % 12 === 0 ? 12 : h % 12;
+          return `${displayHour}:00 ${ampm}`;
+        };
+        
+        return `${dateStr}, ${formatHour(startHour)} - ${formatHour(endHour)}`;
       };
-    }));
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Leaderboard");
-    XLSX.writeFile(workbook, "myG_Runner_Leaderboard.xlsx");
+
+      // Group all plays by their hour slot
+      const grouped = {};
+      allPlays.forEach(play => {
+        const slot = getHourSlotString(play.playedAt);
+        if (!grouped[slot]) {
+          grouped[slot] = [];
+        }
+        grouped[slot].push(play);
+      });
+
+      // Sort plays within each hour slot in descending order of score
+      Object.keys(grouped).forEach(slot => {
+        grouped[slot].sort((a, b) => b.score - a.score);
+      });
+
+      // Sort slots chronologically/newest first
+      const sortedSlots = Object.keys(grouped).sort((a, b) => {
+        return new Date(grouped[b][0].playedAt) - new Date(grouped[a][0].playedAt);
+      });
+
+      const workbook = XLSX.utils.book_new();
+
+      // 1. Create a combined sheet with all slots
+      const combinedRows = [];
+      sortedSlots.forEach(slot => {
+        grouped[slot].forEach((play, index) => {
+          combinedRows.push({
+            'Hour Slot': slot,
+            'Hourly Rank': index + 1,
+            'Player Name': play.name,
+            'Phone Number': play.phone,
+            'Age': play.age,
+            'Score (Coins)': play.score,
+            'Played At': play.playedAt.toLocaleString()
+          });
+        });
+      });
+
+      const combinedSheet = XLSX.utils.json_to_sheet(combinedRows);
+      XLSX.utils.book_append_sheet(workbook, combinedSheet, "All Hours");
+
+      // 2. Create individual sheets for each hour
+      sortedSlots.forEach(slot => {
+        const slotRows = grouped[slot].map((play, index) => ({
+          'Hourly Rank': index + 1,
+          'Player Name': play.name,
+          'Phone Number': play.phone,
+          'Age': play.age,
+          'Score (Coins)': play.score,
+          'Played At': play.playedAt.toLocaleString()
+        }));
+        
+        const slotSheet = XLSX.utils.json_to_sheet(slotRows);
+        
+        // Sanitize sheet name to fit Excel limitations (max 31 chars, no special chars)
+        let sheetName = slot
+          .replace(/:00/g, '')  // "May 23, 07:00 AM - 08:00 AM" -> "May 23, 07 AM - 08 AM"
+          .replace(/,/g, '')    // "May 23 07 AM - 08 AM"
+          .replace(/\s+/g, ' ')  // Collapse spaces
+          .replace(/[^a-zA-Z0-9 ]/g, '') // remove special symbols
+          .trim();
+        
+        if (sheetName.length > 31) {
+          sheetName = sheetName.substring(0, 31);
+        }
+        
+        XLSX.utils.book_append_sheet(workbook, slotSheet, sheetName || 'Hour Slot');
+      });
+
+      XLSX.writeFile(workbook, "myG_Runner_Hourly_Leaderboard_Export.xlsx");
+    } catch (err) {
+      console.error('Error generating hourly excel download:', err);
+      alert('Error generating Excel file: ' + err.message);
+    } finally {
+      setLoadingData(false);
+    }
   };
 
   if (!isAuthenticated) {
@@ -558,7 +734,7 @@ const Dashboard = () => {
 
             <div className="data-section">
               <div className="section-header">
-                <h2 className="section-title">Leaderboard Analytics</h2>
+                <h2 className="section-title">Leaderboard Analytics (Hourly Slot: {getCurrentHourBlock()})</h2>
                 <button className="download-btn" onClick={downloadExcel} disabled={loadingData || players.length === 0}>
                   <Download size={14} /> Download Excel
                 </button>
