@@ -277,21 +277,6 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
           <Trophy size={64} className="empty-icon" />
           <h2>NO SCORES REGISTERED YET!</h2>
           <p>BE THE FIRST TO MAKE HISTORY!</p>
-          
-          {/* QR Code always shown under the empty message */}
-          <div className="tv-bottom-left-qr" style={{ marginTop: '24px', alignSelf: 'center' }}>
-            <div className="qr-wrapper">
-              <img
-                src="/images/qr/mygplay_qr_brand.png"
-                alt="Scan to Play"
-                className="qr-img"
-                onError={(e) => { e.target.src = "/images/qr/mygplay_qr.svg"; }}
-              />
-            </div>
-            <div className="qr-label font-goofy">
-              <span>SCAN TO PLAY</span>
-            </div>
-          </div>
         </div>
       ) : (
         <div className="tv-grid-layout">
@@ -376,21 +361,6 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
               )}
             </div>
 
-            {/* QR Code — Bottom Left of podium panel */}
-            <div className="tv-bottom-left-qr">
-              <div className="qr-wrapper">
-                <img
-                  src="/images/qr/mygplay_qr_brand.png"
-                  alt="Scan to Play"
-                  className="qr-img"
-                  onError={(e) => { e.target.src = "/images/qr/mygplay_qr.svg"; }}
-                />
-              </div>
-              <div className="qr-label font-goofy">
-                <span>SCAN TO PLAY</span>
-              </div>
-            </div>
-
           </div>
 
           {/* RIGHT: LEADERBOARD LIST (Ranks 4+) */}
@@ -426,18 +396,36 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         </div>
       )}
 
-      {/* Hourly Winner Announcement Ticker */}
-      <footer className="tv-footer-ticker">
-        <div className="ticker-badge font-goofy">
-          <Trophy size={16} className="ticker-trophy" />
-          <span>HOURLY REWARDS</span>
-        </div>
-        <div className="ticker-wrap">
-          <div className="ticker-content">
-            WINNERS ARE SELECTED EVERY HOUR! THE TOP PLAYER FROM EACH HOUR WINS EXCITING REWARDS!
+      {/* Permanent Bottom Panel: QR Code (Left) + Sliding Ticker (Right) */}
+      <div className="tv-bottom-bar-container" style={{ display: 'flex', alignItems: 'center', gap: '20px', width: '100%', marginTop: 'auto', flexShrink: 0 }}>
+        {/* QR Code always shown on the bottom left of the screen */}
+        <div className="tv-bottom-left-qr" style={{ animation: 'none', transform: 'none', alignSelf: 'center', margin: 0 }}>
+          <div className="qr-wrapper">
+            <img
+              src="/images/qr/mygplay_qr_brand.png"
+              alt="Scan to Play"
+              className="qr-img"
+              onError={(e) => { e.target.src = "/images/qr/mygplay_qr.svg"; }}
+            />
+          </div>
+          <div className="qr-label font-goofy">
+            <span>SCAN TO PLAY</span>
           </div>
         </div>
-      </footer>
+
+        {/* Sliding Ticker sits directly to the right of the QR */}
+        <footer className="tv-footer-ticker" style={{ flex: 1, margin: 0 }}>
+          <div className="ticker-badge font-goofy">
+            <Trophy size={16} className="ticker-trophy" />
+            <span>HOURLY REWARDS</span>
+          </div>
+          <div className="ticker-wrap">
+            <div className="ticker-content">
+              WINNERS ARE SELECTED EVERY HOUR! THE TOP PLAYER FROM EACH HOUR WINS EXCITING REWARDS! PLAY NOW AND SECURE YOUR SPOT!
+            </div>
+          </div>
+        </footer>
+      </div>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
