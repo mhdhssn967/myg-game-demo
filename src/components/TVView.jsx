@@ -277,6 +277,21 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
           <Trophy size={64} className="empty-icon" />
           <h2>NO SCORES REGISTERED YET!</h2>
           <p>BE THE FIRST TO MAKE HISTORY!</p>
+          
+          {/* QR Code always shown under the empty message */}
+          <div className="tv-bottom-left-qr" style={{ marginTop: '24px', alignSelf: 'center' }}>
+            <div className="qr-wrapper">
+              <img
+                src="/images/qr/mygplay_qr_brand.png"
+                alt="Scan to Play"
+                className="qr-img"
+                onError={(e) => { e.target.src = "/images/qr/mygplay_qr.svg"; }}
+              />
+            </div>
+            <div className="qr-label font-goofy">
+              <span>SCAN TO PLAY</span>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="tv-grid-layout">
@@ -659,11 +674,11 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
           display: flex;
           flex-direction: row;          /* horizontal: QR image + label side-by-side */
           align-items: center;
-          gap: 10px;
+          gap: 12px;
           background: rgba(10,5,24,0.85);
           border: 2px solid #ff6b00;
-          padding: 8px 14px 8px 8px;
-          border-radius: 16px;
+          padding: 10px 18px 10px 10px;
+          border-radius: 18px;
           backdrop-filter: blur(12px);
           box-shadow: 0 10px 28px rgba(0,0,0,0.8), 0 0 18px rgba(255,107,0,0.2);
           align-self: flex-start;       /* don't stretch full width */
@@ -673,15 +688,15 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         .tv-bottom-left-qr:hover { transform: scale(1.02); border-color: #ff9e00; }
         .qr-wrapper {
           background: #fff;
-          padding: 5px;
-          border-radius: 10px;
+          padding: 6px;
+          border-radius: 12px;
           display: flex;
           align-items: center;
           justify-content: center;
         }
-        .qr-img { width: 80px; height: 80px; display: block; }
+        .qr-img { width: 100px; height: 100px; display: block; }
         .qr-label {
-          font-size: 16px;
+          font-size: 18px;
           color: #ff6b00;
           letter-spacing: 0.08em;
           text-shadow: 0 0 8px rgba(255,107,0,0.5);
