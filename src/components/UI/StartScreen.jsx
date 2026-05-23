@@ -71,42 +71,44 @@ const StartScreen = ({ onStart, profile }) => {
         </div>
         
         {/* Controls Panel */}
-        <div style={styles.controlsPanel}>
-          <span style={styles.panelLabel}>GAME CONTROLS</span>
-          
-          <div style={styles.controlsList}>
-            {/* Control 1 */}
-            <div style={styles.controlItem}>
-              <div style={styles.iconBoxOrange}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M17 11l-5-5-5 5M17 18l-5-5-5 5"/>
-                </svg>
-              </div>
-              <div style={styles.controlText}>
-                <span style={styles.controlSub}>TAP</span>
-                <span style={styles.controlMain}>TO JUMP</span>
-              </div>
-            </div>
+        {livesLeft > 0 && (
+          <div style={styles.controlsPanel}>
+            <span style={styles.panelLabel}>GAME CONTROLS</span>
             
-            {/* Control 2 */}
-            <div style={styles.controlItem}>
-              <div style={styles.iconBoxPurple}>
-                <div style={{ position: 'relative' }}>
+            <div style={styles.controlsList}>
+              {/* Control 1 */}
+              <div style={styles.controlItem}>
+                <div style={styles.iconBoxOrange}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M17 11l-5-5-5 5M17 18l-5-5-5 5"/>
                   </svg>
                 </div>
+                <div style={styles.controlText}>
+                  <span style={styles.controlSub}>TAP</span>
+                  <span style={styles.controlMain}>TO JUMP</span>
+                </div>
               </div>
-              <div style={styles.controlText}>
-                <span style={styles.controlSub}>DOUBLE TAP</span>
-                <span style={styles.controlMain}>TO JUMP HIGHER</span>
+              
+              {/* Control 2 */}
+              <div style={styles.controlItem}>
+                <div style={styles.iconBoxPurple}>
+                  <div style={{ position: 'relative' }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 11l-5-5-5 5M17 18l-5-5-5 5"/>
+                    </svg>
+                  </div>
+                </div>
+                <div style={styles.controlText}>
+                  <span style={styles.controlSub}>DOUBLE TAP</span>
+                  <span style={styles.controlMain}>TO JUMP HIGHER</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Lives Left Hearts Display */}
-        {renderHearts()}
+        {livesLeft > 0 && renderHearts()}
 
         {/* Start Button */}
         {livesLeft === 0 ? (
@@ -170,16 +172,58 @@ const StartScreen = ({ onStart, profile }) => {
           </svg>
         </button>
 
-        {/* Crafted By GameFaktory Branding */}
+        {/* Co-Branding Area */}
         <a
-          href="https://www.gamefaktory.com"
+          href="https://www.instagram.com/__oqulix__?igsh=dDg0OWFycTFxMjNm"
           target="_blank"
           rel="noopener noreferrer"
-          style={styles.craftedWrap}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '4px',
+            marginTop: '12px',
+            textDecoration: 'none',
+            cursor: 'pointer',
+            position: 'relative'
+          }}
           className="crafted-brand-interactive"
         >
           <span style={styles.craftedText}>CRAFTED BY</span>
-          <img src="/images/gflogo.webp" alt="GameFaktory" style={styles.craftedLogo} />
+          
+          <div style={{ position: 'relative', display: 'inline-block', paddingRight: '12px' }}>
+            <img src="/images/gflogo.webp" alt="GameFaktory" style={styles.craftedLogo} />
+            
+            {/* Instagram Link Indicator (Degree Symbol style) */}
+            <div 
+              style={{
+                position: 'absolute',
+                top: '-8px',
+                right: '-4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <svg 
+                width="16" 
+                height="16" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="#e1306c" 
+                strokeWidth="2.5" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                style={{
+                  filter: 'drop-shadow(0 0 4px rgba(225, 48, 108, 0.5))'
+                }}
+              >
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+              </svg>
+            </div>
+          </div>
         </a>
 
         {/* Footer info */}
@@ -220,6 +264,17 @@ const StartScreen = ({ onStart, profile }) => {
         }
         .leaderboard-button-interactive:active {
           transform: scale(0.97);
+        }
+
+        .insta-link-interactive {
+          transition: transform 0.2s ease, filter 0.2s ease;
+        }
+        .insta-link-interactive:hover {
+          transform: scale(1.1);
+          filter: drop-shadow(0 0 8px rgba(220, 39, 67, 0.6));
+        }
+        .insta-link-interactive:active {
+          transform: scale(0.95);
         }
         @keyframes start-bounce-x {
           0%, 100% { transform: translateX(0); }

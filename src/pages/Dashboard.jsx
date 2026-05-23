@@ -120,6 +120,7 @@ const Dashboard = () => {
 
   const [players, setPlayers] = useState([]);
   const [loadingData, setLoadingData] = useState(false);
+  const [selectedHour, setSelectedHour] = useState('current');
 
   const getCurrentHourBlock = () => {
     const now = new Date();
@@ -133,6 +134,39 @@ const Dashboard = () => {
     };
     
     return `${formatHour(startHour)} - ${formatHour(endHour)}`;
+  };
+
+  const getSelectedHourLimits = (hourVal) => {
+    const now = new Date();
+    const startOfHour = new Date(now);
+    const endOfHour = new Date(now);
+    
+    if (hourVal === 'current') {
+      const currentH = now.getHours();
+      startOfHour.setHours(currentH, 0, 0, 0);
+      endOfHour.setHours(currentH, 59, 59, 999);
+    } else {
+      const selectedH = parseInt(hourVal, 10);
+      startOfHour.setHours(selectedH, 0, 0, 0);
+      endOfHour.setHours(selectedH, 59, 59, 999);
+    }
+    
+    return { startOfHour, endOfHour };
+  };
+
+  const getSelectedHourBlockLabel = (hourVal) => {
+    if (hourVal === 'current') {
+      return getCurrentHourBlock();
+    }
+    const h = parseInt(hourVal, 10);
+    const startH = h;
+    const endH = (h + 1) % 24;
+    const formatHour = (hour) => {
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+      return `${displayHour} ${ampm}`;
+    };
+    return `${formatHour(startH)} - ${formatHour(endH)}`;
   };
 
   useEffect(() => {
@@ -174,13 +208,8 @@ const Dashboard = () => {
           });
         });
 
-        // Filter by the current clock hour (e.g. 7-8, 8-9, etc.)
-        const now = new Date();
-        const startOfHour = new Date(now);
-        startOfHour.setMinutes(0, 0, 0);
-        startOfHour.setMilliseconds(0);
-        const endOfHour = new Date(now);
-        endOfHour.setMinutes(59, 59, 999);
+        // Filter by the selected clock hour limits
+        const { startOfHour, endOfHour } = getSelectedHourLimits(selectedHour);
 
         const hourlyPlayers = [];
         fetchedPlayers.forEach((player) => {
@@ -198,7 +227,7 @@ const Dashboard = () => {
             const hourlyHigh = Math.max(...filteredScores.map(s => Number(s.score || 0)));
             const hourlyTotal = filteredScores.reduce((sum, s) => sum + Number(s.score || 0), 0);
             
-            // Sort to find the latest playedAt within the current hour
+            // Sort to find the latest playedAt within the selected hour
             const sortedScores = [...filteredScores].sort((a, b) => new Date(b.playedAt || b['played at'] || b.played_at) - new Date(a.playedAt || a['played at'] || a.played_at));
             const hourlyLast = sortedScores[0].playedAt || sortedScores[0]['played at'] || sortedScores[0].played_at;
 
@@ -209,7 +238,7 @@ const Dashboard = () => {
               lastPlayedAt: hourlyLast
             });
           } else {
-            // Fallback: check if the overall lastPlayedAt is within the current hour
+            // Fallback: check if the overall lastPlayedAt is within the selected hour
             if (player.lastPlayedAt && player.lastPlayedAt !== 'N/A') {
               const d = new Date(player.lastPlayedAt);
               if (d >= startOfHour && d <= endOfHour) {
@@ -237,7 +266,7 @@ const Dashboard = () => {
     };
 
     fetchPlayers();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, selectedHour]);
 
   const downloadExcel = async () => {
     setLoadingData(true);
@@ -733,13 +762,48 @@ const Dashboard = () => {
             </div>
 
             <div className="data-section">
-              <div className="section-header">
-                <h2 className="section-title">Leaderboard Analytics (Hourly Slot: {getCurrentHourBlock()})</h2>
-                {/* 
-                <button className="download-btn" onClick={downloadExcel} disabled={loadingData || players.length === 0}>
-                  <Download size={14} /> Download Excel
-                </button>
-                */}
+              <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                <h2 className="section-title" style={{ margin: 0 }}>
+                  Leaderboard Analytics (Hourly Slot: {getSelectedHourBlockLabel(selectedHour)})
+                </h2>
+                
+                {/* Hourly Timings Selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <label htmlFor="hourly-selector" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontWeight: '600' }}>Select Timing:</label>
+                  <select
+                    id="hourly-selector"
+                    value={selectedHour}
+                    onChange={(e) => setSelectedHour(e.target.value)}
+                    style={{
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: '8px',
+                      padding: '8px 12px',
+                      color: '#fff',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      outline: 'none',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    <option value="current" style={{ background: '#0c0a15', color: '#fff' }}>Current Hour</option>
+                    {Array.from({ length: 24 }, (_, i) => {
+                      const startH = i;
+                      const endH = (i + 1) % 24;
+                      const formatHour = (h) => {
+                        const ampm = h >= 12 ? 'PM' : 'AM';
+                        const displayHour = h % 12 === 0 ? 12 : h % 12;
+                        return `${displayHour} ${ampm}`;
+                      };
+                      return (
+                        <option key={i} value={String(i)} style={{ background: '#0c0a15', color: '#fff' }}>
+                          {`${formatHour(startH)} - ${formatHour(endH)}`}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
               </div>
               <div className="table-container">
                 <table className="data-table">
