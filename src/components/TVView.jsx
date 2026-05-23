@@ -15,13 +15,13 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
     const now = new Date();
     const startHour = now.getHours();
     const endHour = (startHour + 1) % 24;
-    
+
     const formatHour = (h) => {
       const ampm = h >= 12 ? 'PM' : 'AM';
       const displayHour = h % 12 === 0 ? 12 : h % 12;
       return `${displayHour} ${ampm}`;
     };
-    
+
     return `${formatHour(startHour)} - ${formatHour(endHour)}`;
   };
 
@@ -32,7 +32,7 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
       const fetchedPlayers = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        
+
         let lastPlayedAt = data.lastPlayedAt || data.lastplayed_at || data.playedAt || 'N/A';
         if (lastPlayedAt === 'N/A' && data.scores && data.scores.length > 0) {
           const dates = data.scores
@@ -81,7 +81,7 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         if (filteredScores.length > 0) {
           const hourlyHigh = Math.max(...filteredScores.map(s => Number(s.score || 0)));
           const hourlyTotal = filteredScores.reduce((sum, s) => sum + Number(s.score || 0), 0);
-          
+
           // Sort to find the latest playedAt within the current hour
           const sortedScores = [...filteredScores].sort((a, b) => new Date(b.playedAt || b['played at'] || b.played_at) - new Date(a.playedAt || a['played at'] || a.played_at));
           const hourlyLast = sortedScores[0].playedAt || sortedScores[0]['played at'] || sortedScores[0].played_at;
@@ -227,9 +227,9 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
   }, []);
 
   const topThree = players.slice(0, 3);
-  
+
   // Split remaining players (up to rank 50) into 2 equal columns (side-by-side)
-  const remainingPlayers = players.slice(3); 
+  const remainingPlayers = players;
   const midIndex = Math.ceil(remainingPlayers.length / 2);
   const leftColPlayers = remainingPlayers.slice(0, midIndex);
   const rightColPlayers = remainingPlayers.slice(midIndex);
@@ -243,8 +243,7 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
 
       {/* Floating Controls at Top Left */}
       <div className={`tv-top-left-controls ${!hideSidebar ? 'sidebar-visible' : ''}`}>
-        {/* Sidebar Toggle Button */}
-        <button 
+        <button
           className={`tv-btn ${!hideSidebar ? 'active' : ''}`}
           onClick={() => setHideSidebar(!hideSidebar)}
           title="Toggle Dashboard Sidebar Menu"
@@ -252,8 +251,8 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
           <Menu size={14} />
           <span>{hideSidebar ? 'Show Menu' : 'Hide Menu'}</span>
         </button>
-        
-        <button 
+
+        <button
           className="tv-btn highlight"
           onClick={toggleFullscreen}
           title="Toggle Fullscreen for TV Display"
@@ -263,7 +262,7 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         </button>
       </div>
 
-      {/* Header Cover Banner (Fully Visible & Uncropped) */}
+      {/* Header Cover Banner */}
       <header className="tv-header-cover">
         <img src="/images/cover.webp" alt="myG Champions Stand Cover" className="tv-cover-img" />
       </header>
@@ -281,27 +280,10 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         </div>
       ) : (
         <div className="tv-grid-layout">
-          {/* TOP SECTION: THE PODIUM STAND (Spans full width) */}
+
+          {/* LEFT: PODIUM */}
           <div className="podium-container">
-            {/* Floating QR Code at Top Left of podium stand for players to scan and join instantly */}
-            <div className="tv-bottom-left-qr">
-              <div className="qr-wrapper">
-                <img 
-                  src="/images/qr/mygplay_qr_brand.png" 
-                  alt="Scan to Play" 
-                  className="qr-img" 
-                  onError={(e) => {
-                    // Fallback to standard SVG if brand PNG fails
-                    e.target.src = "/images/qr/mygplay_qr.svg";
-                  }}
-                />
-              </div>
-              <div className="qr-label font-goofy">
-                <span>SCAN TO PLAY</span>
-              </div>
-            </div>
-          
-            
+
             <div className="tv-podium">
               {/* 🥈 SECOND PLACE */}
               {topThree[1] ? (
@@ -313,7 +295,7 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
                     <span className="podium-rank-label font-goofy">2ND PLACE</span>
                     <h2 className="podium-player-name">{topThree[1].name}</h2>
                     <div className="score-badge silver-score">
-                      <Coins size={22} className="score-badge-coin" />
+                      <Coins size={18} className="score-badge-coin" />
                       <span>{topThree[1].highscore.toLocaleString()}</span>
                     </div>
                   </div>
@@ -327,7 +309,7 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
                 </div>
               )}
 
-              {/* 🥇 FIRST PLACE (TALLER, CROWNED, ULTRA BIG) */}
+              {/* 🥇 FIRST PLACE */}
               {topThree[0] ? (
                 <div className="podium-column gold-podium animate-slide-up-gold">
                   <div className="crown-holder">
@@ -340,7 +322,7 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
                     <span className="podium-rank-label gold-glow font-goofy">CHAMPION</span>
                     <h2 className="podium-player-name gold-name">{topThree[0].name}</h2>
                     <div className="score-badge gold-score animate-pulse">
-                      <Coins size={30} className="gold-coin-glow" />
+                      <Coins size={26} className="gold-coin-glow" />
                       <span>{topThree[0].highscore.toLocaleString()}</span>
                     </div>
                   </div>
@@ -364,7 +346,7 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
                     <span className="podium-rank-label font-goofy">3RD PLACE</span>
                     <h2 className="podium-player-name">{topThree[2].name}</h2>
                     <div className="score-badge bronze-score">
-                      <Coins size={22} className="score-badge-coin" />
+                      <Coins size={18} className="score-badge-coin" />
                       <span>{topThree[2].highscore.toLocaleString()}</span>
                     </div>
                   </div>
@@ -378,9 +360,25 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
                 </div>
               )}
             </div>
+
+            {/* QR Code — Bottom Left of podium panel */}
+            <div className="tv-bottom-left-qr">
+              <div className="qr-wrapper">
+                <img
+                  src="/images/qr/mygplay_qr_brand.png"
+                  alt="Scan to Play"
+                  className="qr-img"
+                  onError={(e) => { e.target.src = "/images/qr/mygplay_qr.svg"; }}
+                />
+              </div>
+              <div className="qr-label font-goofy">
+                <span>SCAN TO PLAY</span>
+              </div>
+            </div>
+
           </div>
 
-          {/* RIGHT SECTION: SINGLE-COLUMN LEADERBOARD LIST (Ranks 4-50) */}
+          {/* RIGHT: LEADERBOARD LIST (Ranks 4+) */}
           <div className="roster-container">
             <div className="roster-header">
               <span className="roster-header-title font-goofy">HOURLY CHAMPIONS ({getCurrentHourBlock()})</span>
@@ -390,8 +388,8 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
             <div className="tv-roster-scroll-box" ref={listRef}>
               <div className="tv-roster-column-list">
                 {remainingPlayers.map((player) => (
-                  <div 
-                    key={player.id} 
+                  <div
+                    key={player.id}
                     className={`tv-roster-row rank-${player.rank}`}
                   >
                     <div className="tv-roster-rank font-goofy">
@@ -401,20 +399,19 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
                       <span className="tv-roster-name">{player.name}</span>
                     </div>
                     <div className="tv-roster-score">
-                      <Coins size={22} className="score-coin" />
+                      <Coins size={18} className="score-coin" />
                       <span>{player.highscore.toLocaleString()}</span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-
-         
           </div>
+
         </div>
       )}
 
-      {/* 📣 Hourly Winner Announcement Ticker Bar */}
+      {/* Hourly Winner Announcement Ticker */}
       <footer className="tv-footer-ticker">
         <div className="ticker-badge font-goofy">
           <Trophy size={16} className="ticker-trophy" />
@@ -430,7 +427,6 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
 
-        /* Dashboard Container Settings */
         .tv-dashboard {
           background: #020107;
           height: calc(100vh - 80px);
@@ -438,22 +434,20 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
           color: #fff;
           font-family: 'Inter', sans-serif;
           position: relative;
-          padding: 24px;
+          padding: 16px 20px;
           box-sizing: border-box;
           overflow: hidden;
           display: flex;
           flex-direction: column;
-          gap: 20px;
+          gap: 12px;
         }
 
-        /* Fullscreen View Overrides */
         .tv-fullscreen {
           position: fixed;
           top: 0; left: 0; right: 0; bottom: 0;
           height: 100vh !important;
-          min-height: 100vh !important;
           z-index: 2000;
-          padding: 30px 40px;
+          padding: 16px 24px;
           background: #020107;
           overflow: hidden;
         }
@@ -461,269 +455,102 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         /* Ambient Neons */
         .tv-glow {
           position: absolute;
-          width: 500px;
-          height: 500px;
+          width: 500px; height: 500px;
           border-radius: 50%;
           filter: blur(160px);
           opacity: 0.12;
           pointer-events: none;
           z-index: 0;
         }
-        .tv-glow.pink {
-          top: -200px;
-          left: -100px;
-          background: #ff007f;
-        }
-        .tv-glow.orange {
-          bottom: -150px;
-          right: -100px;
-          background: #ff6b00;
-        }
-        .tv-glow.blue {
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          background: #00ffff;
-          width: 600px;
-          height: 600px;
-          opacity: 0.05;
-        }
+        .tv-glow.pink  { top: -200px; left: -100px; background: #ff007f; }
+        .tv-glow.orange { bottom: -150px; right: -100px; background: #ff6b00; }
+        .tv-glow.blue  { top: 50%; left: 50%; transform: translate(-50%,-50%); background: #00ffff; width: 600px; height: 600px; opacity: 0.05; }
 
-        /* Control Panel */
-        .tv-controls {
-          position: relative;
-          z-index: 10;
+        /* Controls */
+        .tv-top-left-controls {
+          position: absolute;
+          top: 16px; left: 20px;
+          z-index: 100;
           display: flex;
-          justify-content: space-between;
-          align-items: center;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.06);
-          padding: 10px 20px;
-          border-radius: 16px;
-          backdrop-filter: blur(10px);
+          gap: 10px;
         }
-        .tv-meta-info {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-        }
-        .live-badge {
-          background: rgba(255, 59, 48, 0.15);
-          color: #ff3b30;
-          border: 1px solid rgba(255, 59, 48, 0.3);
-          padding: 4px 12px;
-          border-radius: 10px;
-          font-weight: 800;
-          font-size: 11px;
-          letter-spacing: 0.08em;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-        .live-dot {
-          width: 6px;
-          height: 6px;
-          background: #ff3b30;
-          border-radius: 50%;
-          animation: pulse 1.2s infinite;
-        }
-        .last-updated-text {
-          font-size: 12px;
-          color: rgba(255, 255, 255, 0.4);
-          font-weight: 500;
-        }
-        .tv-actions {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
+        .tv-fullscreen .tv-top-left-controls.sidebar-visible { left: 304px; }
         .tv-btn {
-          background: rgba(255, 255, 255, 0.04);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          color: rgba(255, 255, 255, 0.7);
-          padding: 8px 16px;
-          border-radius: 12px;
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.08);
+          color: rgba(255,255,255,0.7);
+          padding: 7px 14px;
+          border-radius: 10px;
           font-size: 12px;
           font-weight: 700;
           cursor: pointer;
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 7px;
           transition: all 0.2s ease;
         }
-        .tv-btn:hover {
-          background: rgba(255, 255, 255, 0.08);
-          color: #fff;
-          border-color: rgba(255, 255, 255, 0.2);
-        }
-        .tv-btn.active {
-          color: #ff6b00;
-          border-color: rgba(255, 107, 0, 0.3);
-          background: rgba(255, 107, 0, 0.06);
-        }
-        .tv-btn.highlight {
-          background: #ff6b00;
-          border: none;
-          color: #fff;
-          box-shadow: 0 4px 12px rgba(255, 107, 0, 0.2);
-        }
-        .tv-btn.highlight:hover {
-          background: #ff8533;
-          transform: translateY(-1px);
-          box-shadow: 0 6px 16px rgba(255, 107, 0, 0.3);
-        }
+        .tv-btn:hover { background: rgba(255,255,255,0.08); color:#fff; border-color: rgba(255,255,255,0.2); }
+        .tv-btn.active { color: #ff6b00; border-color: rgba(255,107,0,0.3); background: rgba(255,107,0,0.06); }
+        .tv-btn.highlight { background: #ff6b00; border: none; color: #fff; box-shadow: 0 4px 12px rgba(255,107,0,0.2); }
+        .tv-btn.highlight:hover { background: #ff8533; transform: translateY(-1px); }
 
-        /* Floating Controls at Top Left */
-        .tv-top-left-controls {
-          position: absolute;
-          top: 24px;
-          left: 24px;
-          z-index: 100;
-          display: flex;
-          gap: 12px;
-          transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        /* Shift right in fullscreen mode when sidebar overlaps the view */
-        .tv-fullscreen .tv-top-left-controls.sidebar-visible {
-          left: 304px; /* 280px sidebar width + 24px padding */
-        }
-
-        /* Floating QR Code Card at Bottom Left */
-        .tv-bottom-left-qr {
-          position: absolute;
-          top: 24px; /* Positioned at top-left of podium container to float in empty space */
-          left: 24px;
-          bottom: auto; /* Clear previous bottom constraint */
-          z-index: 100;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 6px; /* Slightly tighter gap */
-          background: rgba(10, 5, 24, 0.85);
-          border: 2px solid #ff6b00; /* Cleaner border */
-          padding: 10px; /* More compact card padding */
-          border-radius: 20px; /* Matching border radius */
-          backdrop-filter: blur(12px);
-          box-shadow: 0 15px 35px rgba(0, 0, 0, 0.85), 0 0 20px rgba(255, 107, 0, 0.25);
-          animation: qr-float 3.5s ease-in-out infinite;
-          transition: all 0.3s ease;
-        }
-        .tv-bottom-left-qr:hover {
-          transform: scale(1.03);
-          border-color: #ff9e00;
-          box-shadow: 0 15px 35px rgba(0, 0, 0, 0.85), 0 0 30px rgba(255, 107, 0, 0.4);
-        }
-        .qr-wrapper {
-          background: #fff;
-          padding: 6px; /* Tighter wrapper padding */
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: inset 0 2px 4px rgba(0,0,0,0.15);
-        }
-        .qr-img {
-          width: 140px; /* Resized to 140px for scannability from distance without overlapping silver pedestal */
-          height: 140px; /* Resized to 140px for scannability from distance without overlapping silver pedestal */
-          display: block;
-        }
-        .qr-label {
-          font-size: 15px; /* Clean proportional label size */
-          color: #ff6b00;
-          letter-spacing: 0.1em;
-          text-shadow: 0 0 8px rgba(255, 107, 0, 0.5);
-          margin-top: 2px;
-          text-align: center;
-        }
-
-        @keyframes qr-float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-6px); }
-        }
-
-        /* Header Cover Banner Styles (Uncropped Cover Banner) */
+        /* ── BANNER ── tighter height so podium gets more room */
         .tv-header-cover {
           position: relative;
           z-index: 10;
-          display: flex;
-          justify-content: center;
-          align-items: center;
           width: 100%;
-          margin: 0 auto;
-          box-sizing: border-box;
           flex-shrink: 0;
         }
         .tv-cover-img {
           width: 100%;
           height: auto;
-          max-height: 290px; /* Reduced from 290px to fit TV layout perfectly */
-          object-fit: cover; /* Full image is shown uncropped */
-          border-radius: 20px;
-          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
-          border: 1.5px solid rgba(255, 255, 255, 0.04);
-          transition: all 0.3s ease;
-        }
-        .tv-cover-img:hover {
-          filter: drop-shadow(0 0 25px rgba(255, 107, 0, 0.15));
+          max-height: 180px;          /* KEY: was 290px — shrunk banner so podium fits */
+          object-fit: cover;
+          border-radius: 16px;
+          box-shadow: 0 10px 28px rgba(0,0,0,0.6);
+          border: 1.5px solid rgba(255,255,255,0.04);
         }
 
-        /* Side-by-Side Split TV Layout */
+        /* ── MAIN GRID: side-by-side ── */
         .tv-grid-layout {
           position: relative;
           z-index: 10;
           flex: 1;
           display: flex;
-          flex-direction: row; /* Side-by-side layout! */
+          flex-direction: row;
           align-items: stretch;
-          gap: 30px;
+          gap: 16px;
           min-height: 0;
-          width: 100%;
         }
 
-        /* 🏆 Podium Section Styles (Spans left side of screen) */
+        /* ── PODIUM PANEL ── */
         .podium-container {
-          background: rgba(10, 5, 24, 0.3);
-          border: 1.5px solid rgba(255, 255, 255, 0.04);
-          border-radius: 30px;
-          padding: 16px 24px; /* Reduced padding slightly to save vertical space */
+          background: rgba(10,5,24,0.3);
+          border: 1.5px solid rgba(255,255,255,0.04);
+          border-radius: 24px;
+          padding: 20px 16px 16px;
           display: flex;
           flex-direction: column;
-          justify-content: center; /* Center podium stands vertically */
+          justify-content: space-between;   /* podium up top, QR pinned bottom */
           align-items: center;
-          box-shadow: 0 15px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03);
+          box-shadow: 0 15px 40px rgba(0,0,0,0.5);
           backdrop-filter: blur(8px);
-          flex: 1.5; /* Takes up left side (Gives more space to top 3) */
+          flex: 1.4;
           min-width: 0;
-          height: 100%;
-          position: relative; /* Enabled relative alignment context for child absolute QR box */
-        }
-        .podium-header {
-          font-size: 22px;
-          text-align: center;
-          margin: 0 0 16px 0;
-          color: #ff6b00;
-          letter-spacing: 0.12em;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 12px;
-          text-shadow: 0 0 10px rgba(255, 107, 0, 0.3);
-        }
-        .sparkle-icon {
-          color: #00ffff;
-          animation: pulse 1.5s infinite;
+          position: relative;
         }
 
-        /* TV 3D Podium Stand Layout */
+        /* Podium stand row */
         .tv-podium {
           display: flex;
           align-items: flex-end;
           justify-content: center;
-          gap: 20px; /* Reduced gap to fit beautifully side-by-side */
+          gap: 12px;
           width: 100%;
-          margin: auto 0;
-          padding-bottom: 10px;
+          flex: 1;
+          min-height: 0;
         }
+
         .podium-column {
           flex: 1;
           display: flex;
@@ -734,200 +561,149 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
         }
 
         .avatar-stand {
-          width: 65px; /* Reduced from 90px */
-          height: 65px; /* Reduced from 90px */
+          width: 60px; height: 60px;
           border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+          display: flex; align-items: center; justify-content: center;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.5);
           z-index: 2;
-          margin-bottom: 10px;
+          margin-bottom: 8px;
         }
-        .avatar-stand .emoji {
-          font-size: 28px; /* Reduced from 38px */
-        }
-        .avatar-stand.gold {
-          width: 80px; /* Reduced from 115px */
-          height: 80px; /* Reduced from 115px */
-          background: rgba(255, 215, 0, 0.15);
-          border: 3px solid #ffd700;
-          box-shadow: 0 0 35px rgba(255, 215, 0, 0.3);
-        }
-        .avatar-stand.silver {
-          background: rgba(192, 192, 192, 0.15);
-          border: 2px solid #c0c0c0;
-          box-shadow: 0 0 20px rgba(192, 192, 192, 0.15);
-        }
-        .avatar-stand.bronze {
-          background: rgba(205, 127, 50, 0.15);
-          border: 2px solid #cd7f32;
-          box-shadow: 0 0 20px rgba(205, 127, 50, 0.15);
-        }
+        .avatar-stand .emoji { font-size: 26px; }
+        .avatar-stand.gold   { width: 76px; height: 76px; background: rgba(255,215,0,0.15); border: 3px solid #ffd700; box-shadow: 0 0 30px rgba(255,215,0,0.3); }
+        .avatar-stand.silver { background: rgba(192,192,192,0.15); border: 2px solid #c0c0c0; }
+        .avatar-stand.bronze { background: rgba(205,127,50,0.15);  border: 2px solid #cd7f32; }
+        .avatar-stand.gold .emoji { font-size: 32px; }
 
         .crown-holder {
           position: absolute;
-          top: -32px; /* Reduced from -46px */
+          top: -28px;
           z-index: 5;
           animation: float-y 2.5s ease-in-out infinite;
         }
-        .gold-crown {
-          font-size: 34px; /* Reduced from 48px */
-          display: block;
-        }
-        .animate-crown {
-          filter: drop-shadow(0 0 8px #ffd700);
-        }
+        .gold-crown { font-size: 30px; display: block; }
+        .animate-crown { filter: drop-shadow(0 0 8px #ffd700); }
 
         .player-details {
           text-align: center;
-          margin-bottom: 12px;
+          margin-bottom: 10px;
           z-index: 2;
           width: 100%;
         }
         .podium-rank-label {
-          font-size: 13px;
-          color: rgba(255, 255, 255, 0.4);
-          letter-spacing: 0.15em;
+          font-size: 11px;
+          color: rgba(255,255,255,0.4);
+          letter-spacing: 0.14em;
           display: block;
-          margin-bottom: 4px;
+          margin-bottom: 2px;
         }
-        .podium-rank-label.gold-glow {
-          color: #ffd700;
-          font-size: 15px;
-          text-shadow: 0 0 8px rgba(255, 215, 0, 0.35);
-        }
-        
-        /* 1. INCREASED Player Name weights (Ultra-Bold) */
+        .podium-rank-label.gold-glow { color: #ffd700; font-size: 13px; text-shadow: 0 0 8px rgba(255,215,0,0.35); }
+
         .podium-player-name {
           font-family: 'Inter', sans-serif !important;
-          font-weight: 800 !important; /* INCREASED WEIGHT */
-          font-size: 24px; /* Reduced from 38px */
+          font-weight: 800 !important;
+          font-size: 20px;
           color: #fff;
-          margin: 0 0 6px 0;
+          margin: 0 0 5px 0;
           line-height: 1.1;
           display: -webkit-box;
           -webkit-line-clamp: 1;
           -webkit-box-orient: vertical;
           overflow: hidden;
           text-transform: uppercase;
-          text-shadow: 0 3px 6px rgba(0, 0, 0, 0.6);
+          text-shadow: 0 2px 5px rgba(0,0,0,0.6);
           word-break: break-all;
-          letter-spacing: 0.02em;
         }
         .podium-player-name.gold-name {
-          font-size: 32px; /* Reduced from 48px */
+          font-size: 28px;
           color: #ffe680;
-          font-weight: 900 !important; /* ULTRA BOLD CHAMPION */
-          text-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+          font-weight: 900 !important;
+          text-shadow: 0 0 14px rgba(255,215,0,0.5);
         }
 
-        /* 2. DECREASED Score values weights (Extra-Thin / Light) */
         .score-badge {
           display: inline-flex;
           align-items: center;
-          gap: 8px;
-          padding: 6px 14px; /* Reduced padding */
-          border-radius: 24px;
-          font-size: 16px; /* Reduced from 22px */
-          box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+          gap: 6px;
+          padding: 5px 12px;
+          border-radius: 20px;
+          font-size: 14px;
         }
-        .score-badge span {
-          font-weight: 300 !important; /* DECREASED WEIGHT */
-          font-family: 'Inter', sans-serif !important;
-          letter-spacing: 0.05em;
-        }
-        .score-badge-coin {
-          color: #fff;
-          opacity: 0.9;
-          width: 16px;
-          height: 16px;
-        }
-        .score-badge.gold-score {
-          background: rgba(255, 215, 0, 0.15);
-          border: 1.5px solid rgba(255, 215, 0, 0.35);
-          color: #ffd700;
-          font-size: 20px; /* Reduced from 28px */
-          padding: 8px 20px; /* Reduced padding */
-          box-shadow: 0 6px 20px rgba(255, 215, 0, 0.15);
-        }
-        .score-badge.gold-score span {
-          font-weight: 300 !important; /* DECREASED WEIGHT */
-        }
-        .score-badge.silver-score {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          color: #fff;
-        }
-        .score-badge.bronze-score {
-          background: rgba(205, 127, 50, 0.1);
-          border: 1px solid rgba(205, 127, 50, 0.2);
-          color: #ffaa66;
-        }
-        .gold-coin-glow {
-          filter: drop-shadow(0 0 8px #ffd700);
-        }
+        .score-badge span { font-weight: 300 !important; font-family: 'Inter', sans-serif !important; }
+        .score-badge-coin { opacity: 0.9; }
+        .score-badge.gold-score   { background: rgba(255,215,0,0.15); border: 1.5px solid rgba(255,215,0,0.35); color: #ffd700; font-size: 18px; padding: 7px 18px; }
+        .score-badge.gold-score span { font-weight: 300 !important; }
+        .score-badge.silver-score { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; }
+        .score-badge.bronze-score { background: rgba(205,127,50,0.1); border: 1px solid rgba(205,127,50,0.2); color: #ffaa66; }
+        .gold-coin-glow { filter: drop-shadow(0 0 8px #ffd700); }
 
-        /* 3D Pedestal stands */
+        /* Pedestals */
         .pedestal {
           width: 100%;
-          border-radius: 14px 14px 0 0;
+          border-radius: 12px 12px 0 0;
           display: flex;
           align-items: center;
           justify-content: center;
           position: relative;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.6);
         }
-        .pedestal-number {
-          font-size: 44px; /* Reduced from 60px */
-          color: rgba(255, 255, 255, 0.08);
-          position: absolute;
-          line-height: 1;
+        .pedestal-number { font-size: 38px; color: rgba(255,255,255,0.08); position: absolute; line-height: 1; }
+        .gold-pedestal   { height: 120px; background: linear-gradient(180deg,#b38600 0%,#332700 100%); border: 2.5px solid #ffd700; border-bottom: none; }
+        .gold-pedestal .pedestal-number { font-size: 52px; color: rgba(255,215,0,0.15); }
+        .silver-pedestal { height: 85px;  background: linear-gradient(180deg,#808080 0%,#1a1a1a 100%); border: 1.5px solid #c0c0c0; border-bottom: none; }
+        .bronze-pedestal { height: 65px;  background: linear-gradient(180deg,#8c5623 0%,#1f1207 100%); border: 1.5px solid #cd7f32; border-bottom: none; }
+        .empty-column { justify-content: flex-end; }
+        .pedestal.empty { background: rgba(255,255,255,0.01); border: 1px dashed rgba(255,255,255,0.05); height: 50px; }
+
+        /* ── QR — pinned to bottom of podium panel ── */
+        .tv-bottom-left-qr {
+          display: flex;
+          flex-direction: row;          /* horizontal: QR image + label side-by-side */
+          align-items: center;
+          gap: 10px;
+          background: rgba(10,5,24,0.85);
+          border: 2px solid #ff6b00;
+          padding: 8px 14px 8px 8px;
+          border-radius: 16px;
+          backdrop-filter: blur(12px);
+          box-shadow: 0 10px 28px rgba(0,0,0,0.8), 0 0 18px rgba(255,107,0,0.2);
+          align-self: flex-start;       /* don't stretch full width */
+          animation: qr-float 3.5s ease-in-out infinite;
+          flex-shrink: 0;
         }
-        .gold-pedestal {
-          height: 135px; /* Reduced from 180px */
-          background: linear-gradient(180deg, #b38600 0%, #332700 100%);
-          border: 2.5px solid #ffd700;
-          border-bottom: none;
+        .tv-bottom-left-qr:hover { transform: scale(1.02); border-color: #ff9e00; }
+        .qr-wrapper {
+          background: #fff;
+          padding: 5px;
+          border-radius: 10px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
-        .gold-pedestal .pedestal-number {
-          font-size: 60px; /* Reduced from 80px */
-          color: rgba(255, 215, 0, 0.15);
+        .qr-img { width: 80px; height: 80px; display: block; }
+        .qr-label {
+          font-size: 16px;
+          color: #ff6b00;
+          letter-spacing: 0.08em;
+          text-shadow: 0 0 8px rgba(255,107,0,0.5);
+          white-space: nowrap;
         }
-        .silver-pedestal {
-          height: 95px; /* Reduced from 130px */
-          background: linear-gradient(180deg, #808080 0%, #1a1a1a 100%);
-          border: 1.5px solid #c0c0c0;
-          border-bottom: none;
-        }
-        .bronze-pedestal {
-          height: 75px; /* Reduced from 100px */
-          background: linear-gradient(180deg, #8c5623 0%, #1f1207 100%);
-          border: 1.5px solid #cd7f32;
-          border-bottom: none;
+        @keyframes qr-float {
+          0%,100% { transform: translateY(0); }
+          50%      { transform: translateY(-4px); }
         }
 
-        .empty-column {
-          justify-content: flex-end;
-        }
-        .pedestal.empty {
-          background: rgba(255, 255, 255, 0.01);
-          border: 1px dashed rgba(255, 255, 255, 0.05);
-          height: 50px;
-        }
-
-        /* 📋 Single-Column Leaderboard List Section (Ranks 4-50) */
+        /* ── LEADERBOARD PANEL ── */
         .roster-container {
-          background: rgba(10, 5, 24, 0.3);
-          border: 1.5px solid rgba(255, 255, 255, 0.04);
-          border-radius: 30px;
-          padding: 24px;
+          background: rgba(10,5,24,0.3);
+          border: 1.5px solid rgba(255,255,255,0.04);
+          border-radius: 24px;
+          padding: 18px 16px;
           display: flex;
           flex-direction: column;
-          flex: 0.9; /* Compact right column for single vertical list */
+          flex: 0.85;
           min-width: 0;
           height: 100%;
-          min-height: 0; /* Essential for flex inner scrolling */
+          min-height: 0;
           box-shadow: 0 15px 40px rgba(0,0,0,0.5);
           backdrop-filter: blur(8px);
         }
@@ -935,412 +711,183 @@ const TVView = ({ hideSidebar, setHideSidebar }) => {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          border-bottom: 2px solid rgba(255, 255, 255, 0.05);
-          padding-bottom: 14px;
-          margin-bottom: 16px;
+          border-bottom: 2px solid rgba(255,255,255,0.05);
+          padding-bottom: 12px;
+          margin-bottom: 12px;
         }
         .roster-header-title {
-          font-size: 20px;
+          font-size: 18px;
           color: #00ffff;
           letter-spacing: 0.1em;
-          text-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+          text-shadow: 0 0 10px rgba(0,255,255,0.3);
         }
         .roster-count {
-          font-size: 11px;
-          color: rgba(255, 255, 255, 0.4);
+          font-size: 10px;
+          color: rgba(255,255,255,0.4);
           letter-spacing: 0.08em;
           background: rgba(255,255,255,0.03);
-          padding: 4px 12px;
+          padding: 4px 10px;
           border-radius: 20px;
           border: 1px solid rgba(255,255,255,0.06);
         }
 
-        /* Custom Scrollbox */
         .tv-roster-scroll-box {
           flex: 1;
           overflow-y: auto;
-          scrollbar-width: none; /* Hide scrollbar Firefox */
-          -ms-overflow-style: none; /* Hide scrollbar IE */
-          padding-right: 4px;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
         }
-        .tv-roster-scroll-box::-webkit-scrollbar {
-          display: none; /* Hide scrollbar Chrome/Safari */
-        }
+        .tv-roster-scroll-box::-webkit-scrollbar { display: none; }
 
-        /* 2-Column Grid Setup */
-        .tv-roster-columns {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 30px;
-          min-height: 100%;
-        }
         .tv-roster-column-list {
           display: flex;
           flex-direction: column;
-          gap: 8px; /* Reduced from 12px */
+          gap: 6px;
         }
 
         .tv-roster-row {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          background: rgba(255, 255, 255, 0.015);
-          border: 1.5px solid rgba(255, 255, 255, 0.03);
-          border-radius: 14px; /* Reduced from 18px */
-          padding: 8px 16px; /* Reduced from 14px 24px */
+          background: rgba(255,255,255,0.015);
+          border: 1.5px solid rgba(255,255,255,0.03);
+          border-radius: 12px;
+          padding: 7px 14px;
           transition: all 0.3s ease;
         }
-        .tv-roster-row:hover {
-          background: rgba(255, 255, 255, 0.035);
-          border-color: rgba(255, 255, 255, 0.07);
-        }
-        .tv-roster-row.top-tier {
-          background: rgba(255, 107, 0, 0.01);
-          border-color: rgba(255, 107, 0, 0.05);
-        }
-        .tv-roster-row.rank-1 {
-          background: rgba(255, 215, 0, 0.03);
-          border-color: rgba(255, 215, 0, 0.15);
-        }
-        .tv-roster-row.rank-2 {
-          background: rgba(255, 255, 255, 0.02);
-          border-color: rgba(255, 255, 255, 0.08);
-        }
-        .tv-roster-row.rank-3 {
-          background: rgba(205, 127, 50, 0.02);
-          border-color: rgba(205, 127, 50, 0.1);
-        }
+        .tv-roster-row:hover { background: rgba(255,255,255,0.035); border-color: rgba(255,255,255,0.07); }
+        .tv-roster-row.rank-1 { background: rgba(255,215,0,0.03); border-color: rgba(255,215,0,0.15); }
+        .tv-roster-row.rank-2 { background: rgba(255,255,255,0.02); border-color: rgba(255,255,255,0.08); }
+        .tv-roster-row.rank-3 { background: rgba(205,127,50,0.02); border-color: rgba(205,127,50,0.1); }
 
-        .tv-roster-rank {
-          font-size: 16px; /* Reduced from 20px */
-          color: rgba(255, 255, 255, 0.3);
-          width: 40px; /* Reduced from 55px */
-        }
-        
-        .tv-roster-name-wrap {
-          flex: 1;
-          min-width: 0;
-        }
-        
-        /* 1. INCREASED Names weights in roster (Bold weight 700) */
+        .tv-roster-rank { font-size: 14px; color: rgba(255,255,255,0.3); width: 36px; }
+        .tv-roster-name-wrap { flex: 1; min-width: 0; }
         .tv-roster-name {
           font-family: 'Inter', sans-serif !important;
-          font-weight: 700 !important; /* INCREASED WEIGHT */
-          font-size: 18px; /* Reduced from 26px */
+          font-weight: 700 !important;
+          font-size: 16px;
           color: #fff;
           text-transform: uppercase;
-          letter-spacing: 0.04em;
+          letter-spacing: 0.03em;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
           display: block;
         }
-        .tv-roster-row.rank-1 .tv-roster-name {
-          color: #ffe680;
-        }
-        .tv-roster-row.rank-2 .tv-roster-name {
-          color: #fff;
-        }
-        .tv-roster-row.rank-3 .tv-roster-name {
-          color: #ffcc99;
-        }
+        .tv-roster-row.rank-1 .tv-roster-name { color: #ffe680; }
+        .tv-roster-row.rank-3 .tv-roster-name { color: #ffcc99; }
 
-        /* 2. DECREASED score weights (Thin/Light weight 300) */
         .tv-roster-score {
           display: flex;
           align-items: center;
-          gap: 8px; /* Reduced from 10px */
-          font-size: 18px; /* Reduced from 24px */
+          gap: 6px;
+          font-size: 16px;
           color: #ff6b00;
           font-family: 'Inter', sans-serif !important;
         }
-        .tv-roster-score span {
-          font-weight: 300 !important; /* DECREASED WEIGHT */
-          letter-spacing: 0.05em;
-        }
-        .tv-roster-row.rank-1 .tv-roster-score {
-          color: #ffd700;
-          text-shadow: 0 0 8px rgba(255,215,0,0.25);
-        }
-        .tv-roster-row.rank-2 .tv-roster-score {
-          color: #fff;
-        }
-        .tv-roster-row.rank-3 .tv-roster-score {
-          color: #ffaa66;
-        }
-        .score-coin {
-          width: 20px;
-          height: 20px;
-          filter: drop-shadow(0 0 4px rgba(255,107,0,0.4));
-        }
+        .tv-roster-score span { font-weight: 300 !important; letter-spacing: 0.04em; }
+        .tv-roster-row.rank-1 .tv-roster-score { color: #ffd700; }
+        .tv-roster-row.rank-2 .tv-roster-score { color: #fff; }
+        .tv-roster-row.rank-3 .tv-roster-score { color: #ffaa66; }
+        .score-coin { filter: drop-shadow(0 0 4px rgba(255,107,0,0.4)); }
 
-        /* Auto-scroll prompt footer */
-        .tv-roster-footer {
-          border-top: 1.5px solid rgba(255, 255, 255, 0.04);
-          padding-top: 12px;
-          text-align: center;
-        }
-        .auto-scroll-hint {
-          font-size: 11px;
-          color: rgba(255, 255, 255, 0.25);
-          font-weight: 800;
-          letter-spacing: 0.1em;
-        }
+        /* Loader / Empty */
+        .tv-loader { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+        .tv-spinner { width: 50px; height: 50px; border: 4px solid rgba(255,107,0,0.1); border-top-color: #ff6b00; border-radius: 50%; animation: spin 1s linear infinite; }
+        .tv-loader-text { font-size: 13px; color: rgba(255,255,255,0.5); letter-spacing: 0.15em; }
+        .tv-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 12px; }
+        .empty-icon { color: rgba(255,255,255,0.1); animation: pulse 2s infinite; }
+        .tv-empty h2 { font-size: 26px; margin: 0; color: #ff6b00; }
+        .tv-empty p  { font-size: 14px; color: rgba(255,255,255,0.4); margin: 0; }
 
-        /* Loader */
-        .tv-loader {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 20px;
-        }
-        .tv-spinner {
-          width: 55px;
-          height: 55px;
-          border: 4px solid rgba(255, 107, 0, 0.1);
-          border-top-color: #ff6b00;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-        .tv-loader-text {
-          font-size: 14px;
-          color: rgba(255, 255, 255, 0.5);
-          letter-spacing: 0.15em;
-        }
-
-        /* Empty State */
-        .tv-empty {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          text-align: center;
-          gap: 12px;
-        }
-        .empty-icon {
-          color: rgba(255, 255, 255, 0.1);
-          animation: pulse 2s infinite;
-        }
-        .tv-empty h2 {
-          font-size: 28px;
-          margin: 0;
-          color: #ff6b00;
-          letter-spacing: 0.05em;
-        }
-        .tv-empty p {
-          font-size: 16px;
-          color: rgba(255,255,255,0.4);
-          margin: 0;
-          letter-spacing: 0.1em;
-        }
-
-        /* Animations */
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        .spin-anim {
-          animation: spin 3s linear infinite;
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 0.5; }
-          50% { opacity: 1; }
-        }
-        .animate-pulse {
-          animation: pulse 2s infinite;
-        }
-        @keyframes pulse-glow {
-          0%, 100% { box-shadow: 0 0 15px rgba(255, 215, 0, 0.2); }
-          50% { box-shadow: 0 0 25px rgba(255, 215, 0, 0.35); }
-        }
-        .animate-pulse-glow {
-          animation: pulse-glow 2.5s infinite;
-        }
-        @keyframes float-y {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-6px); }
-        }
-        @keyframes slide-up {
-          from { transform: translateY(30px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        .animate-slide-up {
-          animation: slide-up 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-        @keyframes slide-up-gold {
-          from { transform: translateY(50px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        .animate-slide-up-gold {
-          animation: slide-up-gold 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-        @keyframes fade-in-out {
-          0%, 100% { opacity: 0.4; }
-          50% { opacity: 0.8; }
-        }
-        .animate-fade-in-out {
-          animation: fade-in-out 3s infinite;
-        }
-
-        .font-goofy {
-          font-family: 'Luckiest Guy', cursive;
-        }
-
-        /* Responsive Breakpoints */
-        @media (max-width: 768px) and (orientation: portrait), (max-width: 600px) {
-          .tv-bottom-left-qr {
-            display: none !important; /* Hide QR code on mobile screens as scanning their own screen is impossible */
-          }
-          .tv-dashboard {
-            height: auto !important;
-            min-height: calc(100vh - 80px) !important;
-          }
-          .tv-grid-layout {
-            flex-direction: column; /* Stack panels vertically on portrait mobile devices */
-            height: auto;
-            gap: 20px;
-          }
-          .podium-container {
-            width: 100%;
-            height: auto;
-          }
-          .roster-container {
-            width: 100%;
-            height: auto;
-          }
-          .tv-cover-img {
-            max-height: 140px;
-          }
-          .tv-podium {
-            gap: 20px;
-          }
-          .pedestal.gold-pedestal { height: 110px; }
-          .pedestal.silver-pedestal { height: 80px; }
-          .pedestal.bronze-pedestal { height: 60px; }
-          .podium-player-name.gold-name { font-size: 34px; }
-          .podium-player-name { font-size: 26px; }
-          .tv-roster-columns {
-            grid-template-columns: 1fr;
-            gap: 15px;
-          }
-        }
-
-        @media (max-width: 480px) {
-          .tv-dashboard {
-            padding: 12px;
-          }
-          .tv-controls {
-            flex-direction: column;
-            gap: 10px;
-            align-items: flex-start;
-          }
-          .tv-actions {
-            width: 100%;
-            justify-content: space-between;
-          }
-          .tv-cover-img {
-            max-height: 90px;
-            border-radius: 12px;
-          }
-          .podium-container {
-            padding: 12px;
-            border-radius: 20px;
-          }
-          .roster-container {
-            padding: 12px;
-            border-radius: 20px;
-          }
-          .avatar-stand {
-            width: 55px;
-            height: 55px;
-          }
-          .avatar-stand .emoji { font-size: 24px; }
-          .avatar-stand.gold { width: 70px; height: 70px; }
-          .gold-crown { font-size: 26px; }
-          .crown-holder { top: -22px; }
-          .podium-player-name.gold-name { font-size: 22px; }
-          .podium-player-name { font-size: 18px; }
-          .score-badge { font-size: 14px; padding: 4px 10px; }
-          .score-badge.gold-score { font-size: 16px; padding: 6px 12px; }
-          .tv-roster-row {
-            padding: 8px 12px;
-            border-radius: 12px;
-          }
-          .tv-roster-name {
-            font-size: 18px;
-          }
-          .tv-roster-score {
-            font-size: 18px;
-          }
-          .tv-roster-rank {
-            width: 32px;
-            font-size: 14px;
-          }
-        }
-
-        /* 📣 Bottom Announcement Ticker Bar */
+        /* ── TICKER ── */
         .tv-footer-ticker {
           position: relative;
           z-index: 10;
           display: flex;
           align-items: center;
-          background: rgba(10, 5, 24, 0.7);
-          border: 2px solid rgba(255, 107, 0, 0.35);
+          background: rgba(10,5,24,0.7);
+          border: 2px solid rgba(255,107,0,0.35);
           border-left: 5px solid #ff6b00;
-          padding: 8px 16px;
-          border-radius: 16px;
+          padding: 7px 14px;
+          border-radius: 14px;
           backdrop-filter: blur(10px);
-          gap: 16px;
-          margin-top: auto; /* Push to the very bottom */
-          box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(255, 107, 0, 0.1);
-          overflow: hidden;
+          gap: 14px;
           flex-shrink: 0;
+          overflow: hidden;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.5);
         }
         .ticker-badge {
           background: #ff6b00;
           color: #fff;
-          padding: 6px 12px;
-          border-radius: 10px;
-          font-size: 13px;
+          padding: 5px 10px;
+          border-radius: 9px;
+          font-size: 12px;
           letter-spacing: 0.08em;
           display: flex;
           align-items: center;
-          gap: 8px;
-          box-shadow: 0 0 15px rgba(255, 107, 0, 0.4);
+          gap: 7px;
+          box-shadow: 0 0 14px rgba(255,107,0,0.4);
           flex-shrink: 0;
           animation: badge-pulse 2s infinite;
         }
-        .ticker-trophy {
-          animation: spin 3s linear infinite;
-          color: #fff;
-        }
-        .ticker-wrap {
-          flex: 1;
-          overflow: hidden;
-          display: flex;
-          align-items: center;
-        }
+        .ticker-trophy { animation: spin 3s linear infinite; }
+        .ticker-wrap { flex: 1; overflow: hidden; display: flex; align-items: center; }
         .ticker-content {
           font-family: 'Inter', sans-serif !important;
           font-weight: 800;
-          font-size: 26px; /* BIG LETTER */
-          color: #ffffff; /* WHITE COLOUR */
+          font-size: 22px;
+          color: #ffffff;
           letter-spacing: 0.04em;
           text-transform: uppercase;
-          text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
           white-space: nowrap;
           animation: ticker-scroll 25s linear infinite;
         }
-        
-        @keyframes ticker-scroll {
-          0% { transform: translateX(100%); }
-          100% { transform: translateX(-100%); }
+
+        /* ── Animations ── */
+        @keyframes spin          { to { transform: rotate(360deg); } }
+        @keyframes pulse         { 0%,100%{opacity:.5} 50%{opacity:1} }
+        @keyframes pulse-glow    { 0%,100%{box-shadow:0 0 15px rgba(255,215,0,.2)} 50%{box-shadow:0 0 25px rgba(255,215,0,.35)} }
+        @keyframes float-y       { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+        @keyframes slide-up      { from{transform:translateY(30px);opacity:0} to{transform:translateY(0);opacity:1} }
+        @keyframes slide-up-gold { from{transform:translateY(50px);opacity:0} to{transform:translateY(0);opacity:1} }
+        @keyframes ticker-scroll { 0%{transform:translateX(100%)} 100%{transform:translateX(-100%)} }
+        @keyframes badge-pulse   { 0%,100%{transform:scale(1);box-shadow:0 0 15px rgba(255,107,0,.4)} 50%{transform:scale(1.03);box-shadow:0 0 25px rgba(255,107,0,.6)} }
+        .animate-pulse          { animation: pulse 2s infinite; }
+        .animate-pulse-glow     { animation: pulse-glow 2.5s infinite; }
+        .animate-slide-up       { animation: slide-up 1s cubic-bezier(.16,1,.3,1) forwards; }
+        .animate-slide-up-gold  { animation: slide-up-gold 1.2s cubic-bezier(.16,1,.3,1) forwards; }
+        .font-goofy             { font-family: 'Luckiest Guy', cursive; }
+
+        /* ── Responsive ── */
+        @media (max-width: 768px) {
+          .tv-dashboard { height: auto !important; min-height: calc(100vh - 80px) !important; padding: 12px; gap: 10px; }
+          .tv-grid-layout { flex-direction: column; height: auto; gap: 14px; }
+          .podium-container, .roster-container { width: 100%; height: auto; }
+          .tv-cover-img { max-height: 100px; }
+          .tv-bottom-left-qr { display: none !important; }
+          .gold-pedestal  { height: 100px; }
+          .silver-pedestal{ height: 72px;  }
+          .bronze-pedestal{ height: 56px;  }
+          .podium-player-name.gold-name { font-size: 22px; }
+          .podium-player-name { font-size: 17px; }
         }
-        @keyframes badge-pulse {
-          0%, 100% { transform: scale(1); box-shadow: 0 0 15px rgba(255, 107, 0, 0.4); }
-          50% { transform: scale(1.03); box-shadow: 0 0 25px rgba(255, 107, 0, 0.6); }
+        @media (max-width: 480px) {
+          .tv-cover-img { max-height: 72px; border-radius: 10px; }
+          .avatar-stand { width: 50px; height: 50px; }
+          .avatar-stand .emoji { font-size: 22px; }
+          .avatar-stand.gold { width: 64px; height: 64px; }
+          .gold-crown { font-size: 24px; }
+          .crown-holder { top: -20px; }
+          .podium-player-name.gold-name { font-size: 18px; }
+          .podium-player-name { font-size: 14px; }
+          .score-badge { font-size: 12px; padding: 3px 8px; }
+          .score-badge.gold-score { font-size: 14px; padding: 5px 10px; }
+          .tv-roster-row { padding: 6px 10px; }
+          .tv-roster-name { font-size: 14px; }
+          .tv-roster-score { font-size: 14px; }
+          .tv-roster-rank { width: 28px; font-size: 12px; }
+          .ticker-content { font-size: 17px; }
         }
       `}</style>
     </div>
