@@ -14,6 +14,7 @@ export default function Game() {
   const [gameStatus, setGameStatus] = useState('idle');
   const [profile, setProfile] = useState(null);
   const [showProfilePrompt, setShowProfilePrompt] = useState(false);
+  const setCanvasStateRef = useRef(null);
   const [profileStep, setProfileStep] = useState('phone');
   const [tempPhone, setTempPhone] = useState('');
   const [tempName, setTempName] = useState('');
@@ -120,6 +121,8 @@ export default function Game() {
         console.warn('Unable to parse stored profile:', err);
       }
     }
+
+    setCanvasStateRef.current = (newState) => { state = newState; };
 
     const productList = ['iphone', 'fridge', 'washing_machine', 'ac', 'laptop', 'microwave', 'tv', 'headphone', 'viccum_cleaner', 'watch', 'blender'];
     
@@ -1445,11 +1448,11 @@ export default function Game() {
         ctx.fillStyle = NEON_ORG; ctx.font = '18px "Luckiest Guy"';
         ctx.fillText('RETRY', W / 2, btnY + 29);
       } else {
-        // Disabled style: grayed out, low opacity, no orange neon stroke
-        ctx.fillStyle = '#111111';
-        ctx.strokeStyle = '#333333'; ctx.lineWidth = 2;
+        // Gold glowing style to highlight the special GameFaktory action
+        ctx.fillStyle = '#1e1605';
+        ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.roundRect(btnX, btnY, btnW, btnH, 8); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = '#555555'; ctx.font = '18px "Luckiest Guy"';
+        ctx.fillStyle = '#ffd700'; ctx.font = '18px "Luckiest Guy"';
         ctx.fillText('RETRY', W / 2, btnY + 29);
       }
 
@@ -1525,6 +1528,24 @@ export default function Game() {
         resetGame();
       }
       if (state === 'dead') {
+        let currentProfile = profileRef.current;
+        if (!currentProfile?.phone) {
+          const stored = window.localStorage.getItem('myg_user_profile');
+          if (stored) {
+            try {
+              currentProfile = JSON.parse(stored);
+            } catch (e) {
+              console.warn(e);
+            }
+          }
+        }
+        const livesLeftVal = currentProfile?.livesLeft !== undefined ? currentProfile.livesLeft : 3;
+
+        // If out of lives, the React GameFaktory modal is shown, so ignore canvas overlay clicks
+        if (livesLeftVal <= 0) {
+          return;
+        }
+
         const bw = 260, bh = 290;
         const bx = W / 2 - bw / 2, by = H / 2 - bh / 2;
         const btnW = 150, btnH = 46;
@@ -1533,23 +1554,6 @@ export default function Game() {
         const btnX = W / 2 - btnW / 2, btnY = by + 155;
         if (clientX >= btnX && clientX <= btnX + btnW &&
             clientY >= btnY && clientY <= btnY + btnH) {
-          // Strictly disable retry button if no lives are left
-          let currentProfile = profileRef.current;
-          if (!currentProfile?.phone) {
-            const stored = window.localStorage.getItem('myg_user_profile');
-            if (stored) {
-              try {
-                currentProfile = JSON.parse(stored);
-              } catch (e) {
-                console.warn(e);
-              }
-            }
-          }
-          const livesLeftVal = currentProfile?.livesLeft !== undefined ? currentProfile.livesLeft : 3;
-          if (livesLeftVal <= 0) {
-            console.log('Retry button clicked but ignored: 0 lives remaining');
-            return;
-          }
           resetGame();
           return;
         }
@@ -2136,7 +2140,20 @@ export default function Game() {
       }
 
       // ── Overlays ──
-      if (state === 'dead') drawGameOver();
+      let currentProfileForDraw = profileRef.current;
+      if (!currentProfileForDraw?.phone) {
+        const stored = window.localStorage.getItem('myg_user_profile');
+        if (stored) {
+          try {
+            currentProfileForDraw = JSON.parse(stored);
+          } catch (e) {}
+        }
+      }
+      const livesLeftValForDraw = currentProfileForDraw?.livesLeft !== undefined ? currentProfileForDraw.livesLeft : 3;
+
+      if (state === 'dead' && livesLeftValForDraw > 0) {
+        drawGameOver();
+      }
 
       if (milestoneTimer > 0) {
         ctx.save();
@@ -2202,6 +2219,16 @@ export default function Game() {
       window.removeEventListener('resize', updateSize);
     };
   }, []);
+
+  const handleGoHome = () => {
+    if (setCanvasStateRef.current) {
+      setCanvasStateRef.current('idle');
+    }
+    setGameStatus('idle');
+    if (document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
 
   const handleStartRequest = () => {
     let currentProfile = profile;
@@ -2577,6 +2604,95 @@ export default function Game() {
           </div>
         </div>
       )}
+
+      {gameStatus === 'dead' && (profile?.livesLeft !== undefined ? profile.livesLeft : 3) <= 0 && (
+        <div style={gfModalStyles.overlay}>
+          <div style={gfModalStyles.box}>
+            <div style={gfModalStyles.logoContainer} onClick={() => window.open('https://www.gamefaktory.com', '_blank')}>
+              <img src="/images/gflogo.webp" alt="GameFaktory" style={gfModalStyles.logo} />
+            </div>
+
+            <h2 style={gfModalStyles.heading}>
+              Do you want to build games for your brand? Or personal?
+            </h2>
+            <p style={gfModalStyles.subtext}>
+              Contact GameFaktory!
+            </p>
+
+            <button 
+              onClick={() => window.open('https://www.gamefaktory.com', '_blank')} 
+              style={gfModalStyles.ctaButton}
+              className="gf-cta-btn-interactive"
+            >
+              <span>GO TO GAMEFAKTORY</span>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+            </button>
+
+            <button 
+              onClick={handleGoHome} 
+              style={gfModalStyles.closeButton}
+              className="gf-close-btn-interactive"
+            >
+              GO TO HOME
+            </button>
+          </div>
+
+          <style>{`
+            .gf-cta-btn-interactive {
+              transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease;
+            }
+            .gf-cta-btn-interactive:hover {
+              transform: scale(1.03);
+              box-shadow: 0 0 30px rgba(255, 107, 0, 0.8);
+            }
+            .gf-cta-btn-interactive:active {
+              transform: scale(0.97);
+            }
+            
+            .gf-close-btn-interactive {
+              transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+            }
+            .gf-close-btn-interactive:hover {
+              background: rgba(255, 255, 255, 0.12);
+              border-color: rgba(255, 255, 255, 0.4);
+              color: #ffffff;
+            }
+            .gf-close-btn-interactive:active {
+              background: rgba(255, 255, 255, 0.08);
+            }
+          `}</style>
+        </div>
+      )}
+
+      {gameStatus === 'dead' && (profile?.livesLeft !== undefined ? profile.livesLeft : 3) > 0 && (
+        <a
+          href="https://www.gamefaktory.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={gfBrandingStyles.craftedWrap}
+          className="crafted-brand-interactive"
+        >
+          <span style={gfBrandingStyles.craftedText}>CRAFTED BY</span>
+          <img src="/images/gflogo.webp" alt="GameFaktory" style={gfBrandingStyles.craftedLogo} />
+          
+          <style>{`
+            .crafted-brand-interactive {
+              transition: transform 0.2s ease, opacity 0.2s ease;
+            }
+            .crafted-brand-interactive:hover {
+              transform: translateX(-50%) scale(1.05) !important;
+              opacity: 1;
+            }
+            .crafted-brand-interactive:active {
+              transform: translateX(-50%) scale(0.97) !important;
+            }
+          `}</style>
+        </a>
+      )}
       {lastSubmitMsg && (
         <div style={{position:'absolute',left:20,top:20,zIndex:3000,background:'#0b1220',color:'#fff',padding:'8px 12px',borderRadius:10,border:'1px solid rgba(255,255,255,0.06)'}}>
           {lastSubmitMsg}
@@ -2670,5 +2786,121 @@ const profileStyles = {
     margin: 0,
     color: '#f8fafc',
     fontSize: '14px',
+  }
+};
+
+const gfModalStyles = {
+  overlay: {
+    position: 'absolute',
+    inset: 0,
+    zIndex: 2500,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'rgba(3, 1, 10, 0.85)',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
+    padding: '20px',
+  },
+  box: {
+    width: '100%',
+    maxWidth: '420px',
+    borderRadius: '28px',
+    background: '#070a14',
+    border: '2px solid #ff6b00',
+    boxShadow: '0 0 50px rgba(255, 107, 0, 0.3)',
+    padding: '32px 24px',
+    color: '#fff',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '20px',
+    fontFamily: '"Luckiest Guy", sans-serif',
+    textAlign: 'center',
+    position: 'relative',
+  },
+  logoContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    cursor: 'pointer',
+    marginBottom: '10px',
+  },
+  logo: {
+    height: '45px',
+    width: 'auto',
+    objectFit: 'contain',
+    filter: 'invert(1) drop-shadow(0 0 12px rgba(255, 255, 255, 0.6))',
+  },
+  heading: {
+    margin: 0,
+    fontSize: '22px',
+    color: '#ffffff',
+    lineHeight: '1.4',
+    letterSpacing: '0.05em',
+  },
+  subtext: {
+    margin: 0,
+    fontSize: '18px',
+    color: '#ff6b00',
+    letterSpacing: '0.08em',
+  },
+  ctaButton: {
+    width: '100%',
+    padding: '16px 20px',
+    borderRadius: '18px',
+    border: 'none',
+    background: '#ff6b00',
+    color: '#ffffff',
+    fontFamily: 'inherit',
+    fontSize: '18px',
+    cursor: 'pointer',
+    boxShadow: '0 0 20px rgba(255, 107, 0, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+  },
+  closeButton: {
+    width: '100%',
+    padding: '12px 20px',
+    borderRadius: '18px',
+    border: '1.5px solid rgba(255, 255, 255, 0.2)',
+    background: 'rgba(255, 255, 255, 0.05)',
+    color: '#d1d5db',
+    fontFamily: 'inherit',
+    fontSize: '14px',
+    cursor: 'pointer',
+  }
+};
+
+const gfBrandingStyles = {
+  craftedWrap: {
+    position: 'absolute',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    top: 'calc(50% + 155px)',
+    zIndex: 1000,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '4px',
+    textDecoration: 'none',
+    cursor: 'pointer',
+  },
+  craftedText: {
+    fontSize: '9px',
+    color: 'rgba(255, 255, 255, 0.35)',
+    letterSpacing: '0.25em',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+  },
+  craftedLogo: {
+    height: '20px',
+    width: 'auto',
+    objectFit: 'contain',
+    filter: 'invert(1) drop-shadow(0 0 8px rgba(255, 255, 255, 0.4))',
+    opacity: 0.85,
   }
 };
