@@ -2639,6 +2639,25 @@ export default function Game() {
             >
               GO TO HOME
             </button>
+
+            <a
+              href="https://www.gamefaktory.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px',
+                textDecoration: 'none',
+                cursor: 'pointer',
+                marginTop: '10px',
+              }}
+              className="crafted-brand-interactive"
+            >
+              <span style={gfBrandingStyles.craftedText}>CRAFTED BY</span>
+              <img src="/images/gflogo.webp" alt="GameFaktory" style={gfBrandingStyles.craftedLogo} />
+            </a>
           </div>
 
           <style>{`
