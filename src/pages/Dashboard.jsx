@@ -325,12 +325,18 @@ const Dashboard = () => {
         return;
       }
 
-      const getHourSlotString = (date) => {
+      // Helper to format date as "May 23 2026"
+      const getDayString = (date) => {
+        const d = new Date(date);
+        if (isNaN(d.getTime())) return 'Unknown Day';
+        const options = { year: 'numeric', month: 'short', day: 'numeric' };
+        return d.toLocaleDateString('en-US', options);
+      };
+
+      // Helper to format hour slot like "9 AM - 10 AM"
+      const getHourSlotLabel = (date) => {
         const d = new Date(date);
         if (isNaN(d.getTime())) return 'Unknown Hour';
-        
-        const optionsDate = { month: 'short', day: 'numeric' };
-        const dateStr = d.toLocaleDateString('en-US', optionsDate);
         
         const startHour = d.getHours();
         const endHour = (startHour + 1) % 24;
@@ -338,82 +344,99 @@ const Dashboard = () => {
         const formatHour = (h) => {
           const ampm = h >= 12 ? 'PM' : 'AM';
           const displayHour = h % 12 === 0 ? 12 : h % 12;
-          return `${displayHour}:00 ${ampm}`;
+          return `${displayHour} ${ampm}`;
         };
         
-        return `${dateStr}, ${formatHour(startHour)} - ${formatHour(endHour)}`;
+        return `${formatHour(startHour)} - ${formatHour(endHour)}`;
       };
 
-      // Group all plays by their hour slot
-      const grouped = {};
+      // Group plays by day
+      const playsByDay = {};
       allPlays.forEach(play => {
-        const slot = getHourSlotString(play.playedAt);
-        if (!grouped[slot]) {
-          grouped[slot] = [];
+        const dayStr = getDayString(play.playedAt);
+        if (!playsByDay[dayStr]) {
+          playsByDay[dayStr] = [];
         }
-        grouped[slot].push(play);
+        playsByDay[dayStr].push(play);
       });
 
-      // Sort plays within each hour slot in descending order of score
-      Object.keys(grouped).forEach(slot => {
-        grouped[slot].sort((a, b) => b.score - a.score);
-      });
+      const sortedDays = Object.keys(playsByDay).sort((a, b) => new Date(b) - new Date(a));
 
-      // Sort slots chronologically/newest first
-      const sortedSlots = Object.keys(grouped).sort((a, b) => {
-        return new Date(grouped[b][0].playedAt) - new Date(grouped[a][0].playedAt);
-      });
+      for (const day of sortedDays) {
+        const playsForDay = playsByDay[day];
+        
+        // Group the plays of this day by hour slot
+        const groupedByHour = {};
+        playsForDay.forEach(play => {
+          const slot = getHourSlotLabel(play.playedAt);
+          if (!groupedByHour[slot]) {
+            groupedByHour[slot] = [];
+          }
+          groupedByHour[slot].push(play);
+        });
 
-      const workbook = XLSX.utils.book_new();
+        // Sort plays within each hour slot in descending order of score
+        Object.keys(groupedByHour).forEach(slot => {
+          groupedByHour[slot].sort((a, b) => b.score - a.score);
+        });
 
-      // 1. Create a combined sheet with all slots
-      const combinedRows = [];
-      sortedSlots.forEach(slot => {
-        grouped[slot].forEach((play, index) => {
-          combinedRows.push({
-            'Hour Slot': slot,
+        // Sort slots chronologically/newest hour first
+        const sortedSlots = Object.keys(groupedByHour).sort((a, b) => {
+          const getStartHourVal = (slotStr) => {
+            const match = slotStr.match(/^(\d+)\s*(AM|PM)/i);
+            if (!match) return 0;
+            let h = parseInt(match[1], 10);
+            const ampm = match[2].toUpperCase();
+            if (ampm === 'PM' && h !== 12) h += 12;
+            if (ampm === 'AM' && h === 12) h = 0;
+            return h;
+          };
+          return getStartHourVal(b) - getStartHourVal(a);
+        });
+
+        const workbook = XLSX.utils.book_new();
+
+        // 1. Create a combined sheet for all hours of this day
+        const combinedRows = [];
+        sortedSlots.forEach(slot => {
+          groupedByHour[slot].forEach((play, index) => {
+            combinedRows.push({
+              'Hour Slot': slot,
+              'Hourly Rank': index + 1,
+              'Player Name': play.name,
+              'Phone Number': play.phone,
+              'Age': play.age,
+              'Score (Coins)': play.score,
+              'Played At': play.playedAt.toLocaleString()
+            });
+          });
+        });
+
+        const combinedSheet = XLSX.utils.json_to_sheet(combinedRows);
+        XLSX.utils.book_append_sheet(workbook, combinedSheet, "All Hours");
+
+        // 2. Create individual sheets for each hour of this day
+        sortedSlots.forEach(slot => {
+          const slotRows = groupedByHour[slot].map((play, index) => ({
             'Hourly Rank': index + 1,
             'Player Name': play.name,
             'Phone Number': play.phone,
             'Age': play.age,
             'Score (Coins)': play.score,
             'Played At': play.playedAt.toLocaleString()
-          });
+          }));
+          
+          const slotSheet = XLSX.utils.json_to_sheet(slotRows);
+          
+          // Sanitize sheet name to fit Excel limitations (max 31 chars)
+          let sheetName = slot.substring(0, 31).trim();
+          XLSX.utils.book_append_sheet(workbook, slotSheet, sheetName || 'Hour Slot');
         });
-      });
 
-      const combinedSheet = XLSX.utils.json_to_sheet(combinedRows);
-      XLSX.utils.book_append_sheet(workbook, combinedSheet, "All Hours");
-
-      // 2. Create individual sheets for each hour
-      sortedSlots.forEach(slot => {
-        const slotRows = grouped[slot].map((play, index) => ({
-          'Hourly Rank': index + 1,
-          'Player Name': play.name,
-          'Phone Number': play.phone,
-          'Age': play.age,
-          'Score (Coins)': play.score,
-          'Played At': play.playedAt.toLocaleString()
-        }));
-        
-        const slotSheet = XLSX.utils.json_to_sheet(slotRows);
-        
-        // Sanitize sheet name to fit Excel limitations (max 31 chars, no special chars)
-        let sheetName = slot
-          .replace(/:00/g, '')  // "May 23, 07:00 AM - 08:00 AM" -> "May 23, 07 AM - 08 AM"
-          .replace(/,/g, '')    // "May 23 07 AM - 08 AM"
-          .replace(/\s+/g, ' ')  // Collapse spaces
-          .replace(/[^a-zA-Z0-9 ]/g, '') // remove special symbols
-          .trim();
-        
-        if (sheetName.length > 31) {
-          sheetName = sheetName.substring(0, 31);
-        }
-        
-        XLSX.utils.book_append_sheet(workbook, slotSheet, sheetName || 'Hour Slot');
-      });
-
-      XLSX.writeFile(workbook, "myG_Runner_Hourly_Leaderboard_Export.xlsx");
+        // Generate customized filename for this specific day
+        const cleanDayName = day.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
+        XLSX.writeFile(workbook, `myG_Runner_Leaderboard_Export_${cleanDayName}.xlsx`);
+      }
     } catch (err) {
       console.error('Error generating hourly excel download:', err);
       alert('Error generating Excel file: ' + err.message);
@@ -774,8 +797,16 @@ const Dashboard = () => {
                   Leaderboard Analytics (Hourly Slot: {getSelectedHourBlockLabel(selectedHour)})
                 </h2>
                 
-                {/* Hourly Timings Selector */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {/* Hourly Timings & Export Selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <button 
+                    className="download-btn" 
+                    onClick={downloadExcel} 
+                    disabled={loadingData}
+                    style={{ marginRight: '8px' }}
+                  >
+                    <Download size={14} /> Export Data
+                  </button>
                   <label htmlFor="hourly-selector" style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', fontWeight: '600' }}>Select Timing:</label>
                   <select
                     id="hourly-selector"
