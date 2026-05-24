@@ -391,11 +391,11 @@ const Dashboard = () => {
         allDataRows.push({
           'Date': dayStr,
           'Hour Slot': hourSlot,
-          'Hourly Rank': slotRank,
+          '#': slotRank,
           'Player Name': play.name,
           'Phone Number': play.phone,
           'Age': play.age,
-          'Score (Coins)': play.score,
+          'Total Score': play.score,
           'Played At': play.playedAt.toLocaleString()
         });
       });
@@ -406,11 +406,11 @@ const Dashboard = () => {
       // 2. Create individual sheets for each hour slot of every date
       sortedSheetNames.forEach(sheetName => {
         const slotRows = playsBySheet[sheetName].map((play, index) => ({
-          'Hourly Rank': index + 1,
+          '#': index + 1,
           'Player Name': play.name,
           'Phone Number': play.phone,
           'Age': play.age,
-          'Score (Coins)': play.score,
+          'Total Score': play.score,
           'Played At': play.playedAt.toLocaleString()
         }));
         
