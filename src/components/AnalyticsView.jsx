@@ -350,7 +350,7 @@ const AnalyticsView = () => {
                 <tr>
                   <th style={styles.th}>Player</th>
                   <th style={styles.th}>Phone</th>
-                  <th style={styles.th} style={{ textAlign: 'right' }}>Today's High</th>
+                  <th style={styles.th}>Today's High</th>
                 </tr>
               </thead>
               <tbody>
@@ -394,7 +394,7 @@ const AnalyticsView = () => {
                 <tr>
                   <th style={styles.th}>Player Name</th>
                   <th style={styles.th}>Time Played</th>
-                  <th style={styles.th} style={{ textAlign: 'right' }}>Score Today</th>
+                  <th style={styles.th}>Score Today</th>
                 </tr>
               </thead>
               <tbody>
