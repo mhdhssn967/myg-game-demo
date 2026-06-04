@@ -274,9 +274,10 @@ export default function App() {
     );
   }
 
-  if (!isPaid) {
-    return <ExpiredScreen error={error} />;
-  }
+  // Bypass payment check to keep the game and dashboard enabled
+  // if (!isPaid) {
+  //   return <ExpiredScreen error={error} />;
+  // }
 
   return (
     <Router>
