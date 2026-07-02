@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { usState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Game from './components/Game';
 import Dashboard from './pages/Dashboard';
